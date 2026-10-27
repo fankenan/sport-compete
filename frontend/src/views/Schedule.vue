@@ -28,6 +28,7 @@
         <t-button variant="outline" @click="openBlock">添加占位</t-button>
         <t-button variant="outline" @click="doCleanEmpty">清理空槽</t-button>
         <t-button variant="outline" @click="loadGantt">刷新</t-button>
+        <t-button variant="outline" @click="openBracket">对阵图</t-button>
 
         <span class="tb-divider"></span>
 
@@ -310,6 +311,17 @@
       </template>
     </t-dialog>
 
+    <!-- 淘汰赛对阵图 -->
+    <t-dialog v-model:visible="bkVisible" header="淘汰赛对阵图" :width="isMobile ? '96%' : '960px'" attach="body">
+      <div class="tb-row" style="margin-bottom: 12px">
+        <t-select v-model="bkBandId" :options="bandOptions" placeholder="选择组别" clearable style="width: 160px" />
+        <t-select v-model="bkEventId" :options="eventOptions" placeholder="选择项目" clearable style="width: 180px" />
+        <span v-if="!bkBandId || !bkEventId" class="panel-hint">选择组别和项目后查看</span>
+      </div>
+      <div v-if="bkLoading" style="padding:40px 0;text-align:center"><t-loading text="加载对阵..." /></div>
+      <BracketTree v-else-if="bkBandId && bkEventId" :rounds="bkRounds" :champion="bkChampion" />
+    </t-dialog>
+
     <!-- 清除整个时间段 -->
     <t-dialog v-model:visible="clearVisible" header="清除时间段" width="460px" attach="body">
       <div class="clear-box">
@@ -418,6 +430,7 @@ import http from '../api/http';
 import { message, confirm } from '../utils/ui';
 import { formatDateCn, parseDate } from '../utils/lunar';
 import { bandLabel } from '../utils/band';
+import BracketTree from '../components/BracketTree.vue';
 
 const store = useUserStore();
 
@@ -963,6 +976,42 @@ async function submitManual() {
     manualSaving.value = false;
   }
 }
+
+/* ---------- 淘汰赛对阵图 ---------- */
+const bkVisible = ref(false);
+const bkBandId = ref(null);
+const bkEventId = ref(null);
+const bkLoading = ref(false);
+const bkRounds = ref([]);
+const bkChampion = ref('');
+
+function openBracket() {
+  bkBandId.value = filterBand.value || null;
+  bkEventId.value = filterEvent.value || null;
+  bkVisible.value = true;
+  if (bkBandId.value && bkEventId.value) loadBracket();
+}
+
+async function loadBracket() {
+  if (!bkBandId.value || !bkEventId.value || !store.competitionId) return;
+  bkLoading.value = true;
+  try {
+    const d = await http.get('/schedule/bracket', {
+      params: {
+        competition_id: store.competitionId,
+        event_item_id: bkEventId.value,
+        band_id: bkBandId.value
+      }
+    });
+    bkRounds.value = d?.rounds || [];
+    bkChampion.value = d?.champion || '';
+  } catch (e) {
+    bkRounds.value = [];
+  } finally {
+    bkLoading.value = false;
+  }
+}
+watch([bkBandId, bkEventId], loadBracket);
 
 /* ---------- 清除整个时间段（点左侧时间） ---------- */
 const clearVisible = ref(false);

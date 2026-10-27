@@ -49,6 +49,16 @@
           <div v-if="!teamRows.length" class="center muted">该赛事尚未发布团体总分</div>
           <t-table v-else :data="teamRows" :columns="teamCols" row-key="unit_name" bordered />
         </t-tab-panel>
+
+        <t-tab-panel value="bracket" label="淘汰赛对阵">
+          <div class="filter">
+            <t-select v-model="bkBandId" :options="bandOptions" placeholder="选择组别" style="width:160px" />
+            <t-select v-model="bkEventId" :options="eventOptions" placeholder="选择项目" style="width:180px" />
+          </div>
+          <div v-if="bkLoading" class="center muted"><t-loading text="加载对阵..." /></div>
+          <div v-else-if="!bkBandId || !bkEventId" class="center muted">选择组别和项目后查看对阵图</div>
+          <BracketTree v-else :rounds="bkRounds" :champion="bkChampion" />
+        </t-tab-panel>
       </t-tabs>
 
       <div class="foot">本页面为公开只读页，无需登录 · 数据来源：体育竞赛管理系统</div>
@@ -60,6 +70,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import http from '../api/http';
+import BracketTree from '../components/BracketTree.vue';
 
 const route = useRoute();
 const uuid = computed(() => route.params.uuid);
@@ -71,6 +82,13 @@ const keyword = ref('');
 const bandId = ref(null);
 const eventId = ref(null);
 const teamRows = ref([]);
+
+/* 淘汰赛对阵 */
+const bkBandId = ref(null);
+const bkEventId = ref(null);
+const bkLoading = ref(false);
+const bkRounds = ref([]);
+const bkChampion = ref('');
 
 const cols = [
   { colKey: 'rank', title: '名次', width: 70, align: 'center' },
@@ -132,8 +150,36 @@ async function load() {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  // URL 参数直达：?tab=bracket&band=12&event=11 （大屏/分享用）
+  const q = route.query;
+  if (q.tab === 'bracket') {
+    tab.value = 'bracket';
+    if (q.band) bkBandId.value = Number(q.band);
+    if (q.event) bkEventId.value = Number(q.event);
+  }
+});
 watch(uuid, load);
+
+/* 淘汰赛对阵加载 */
+async function loadBracket() {
+  if (!bkBandId.value || !bkEventId.value || !uuid.value) return;
+  bkLoading.value = true;
+  try {
+    const d = await http.get(`/public/meet/${uuid.value}/bracket`, {
+      params: { event_item_id: bkEventId.value, band_id: bkBandId.value }
+    });
+    bkRounds.value = d?.rounds || [];
+    bkChampion.value = d?.champion || '';
+  } catch (e) {
+    bkRounds.value = [];
+  } finally {
+    bkLoading.value = false;
+  }
+}
+watch([bkBandId, bkEventId], loadBracket);
+watch(tab, (t) => { if (t === 'bracket' && !bkBandId.value) { bkBandId.value = bandId.value || (bandOptions.value[0]?.id ?? null); bkEventId.value = eventId.value || (eventOptions.value[0]?.id ?? null); } });
 
 // 自动刷新（每 60 秒）
 let timer = null;
