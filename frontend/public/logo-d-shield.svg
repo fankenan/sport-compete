@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img">
+  <title>方案 D · 盾徽与跑道</title>
+  <path d="M32 4 L54 12 V30 C54 43 44.5 53.5 32 58 C19.5 53.5 10 43 10 30 V12 Z" fill="#0052D9"/>
+  <path d="M32 33 L33.56 37.03 L37.88 37.29 L34.53 40.03 L35.65 44.22 L32 41.8 L28.35 44.22 L29.47 40.03 L26.12 37.29 L30.44 37.03 Z" fill="#FFC53D"/>
+  <path d="M16 50 C16 40 23 34 32 34 C41 34 48 40 48 50" fill="none" stroke="#FFFFFF" stroke-opacity="0.32" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M22 50 C22 43.5 26.4 39.5 32 39.5 C37.6 39.5 42 43.5 42 50" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2.2" stroke-linecap="round"/>
+</svg>

@@ -76,8 +76,44 @@ python deploy_fix_1027.py                          # 推内网机 + 腾讯云 + 
 | 5 | 点空槽直接新增比赛 | `Schedule.vue` |
 | 6 | 点左侧时间清除整段（含已录分保护） | `routes/schedule.js` 新增 `POST /schedule/clear-time` |
 | 7 | 筛选后比赛全部消失（补 band_id/event_item_id）+ 隐藏数量提示 | `routes/schedule.js`、`Schedule.vue` |
+| 8 | 淘汰赛对阵图：公开页 / 大屏 / 赛程编排三处接入 | `BracketTree.vue`、`routes/schedule.js` `/bracket`、`routes/publicMeet.js` |
+| 9 | **P0 止血**：清死代码 441 行 + 旧径赛分组路径弃用标记 | 见下节 |
+
+## 五·补、P0 止血（2026-10-27 晚）
+
+**先查证再动手**：`probe_dual_track.py`（只读）确认
+`track_heat`/`heat_entry` = 0 行、`heat_group`/`heat_member` = 1/4 行（落在篮球项目上，误点脏数据）、
+线上只在跑球类（match_info 12、schedule_slot 51、team_entry 13）。
+→ **统一径赛分组路径零数据迁移风险**，可以放心改。
+
+**已删死代码（441 行）**
+- `services/track-algorithms.js` −264 行：删 `advanceFromHeats` / `standardSeedOrder` /
+  `buildByeBracket` / `generateLaneSheet` / `allocateBibNumbers` / `assignLanesBySeed`
+  （7 个函数只有 `decideRaceFormat`、`allocateHeats` 真被 `scheduler` 调用，463 → 170 行）
+- `services/schedule-algorithms.js` −177 行：删 `generateSlots` / `packSchedule` /
+  `advanceToKnockout` 及局部 `addMinutes`（早期原型，线上跑的是 `scheduler.js` 同名实现，555 → 377 行）
+- `services/scheduler.js`：移除 import 了却从未调用的 3 个引用
+
+**已加弃用标记（不改行为）**
+- `POST /group/track-generate` 加 `console.warn`（写旧表，成绩录入页看不到）
+- `Grouping.vue` 点「径赛分组」先弹确认，引导去「成绩录入 → 分组编排」
+
+**教训**：`看起来在用 ≠ 真的在用`。本轮发现 3 个函数是 import 进来了却从未调用。
+删任何代码前一律全项目 grep 确认，并保留 `runTests` 做回归。
 
 ## 六、待办
+
+- [ ] 移动端（手机）上的甘特图拖拽体验未实测，仅桌面端验证过
+- [ ] 服务器上的 dist 与 GitHub 源码尚未建立自动同步，改完代码要手动推一次
+- [ ] 报名、秩序册导出等模块的回归没有覆盖自动化测试，改动后建议手工过一遍
+- [ ] **P1 整合**（详见 `系统重构规划.md`）：① 统一径赛分组到 `track_heat`/`heat_entry`，
+      `Grouping.vue` 田径入口改调 `/track-result/arrange`，旧表 `heat_group`/`heat_member` 转归档
+      ② 积分榜 3 端点收敛为 1（复用视图 `v_group_standing`）
+      ③ 全能计算收归 `scoreEngine` ④ 抽 `pdfService` 合并重复的 `dataUrlToBuffer`
+- [ ] **清理线上脏数据**（需确认后执行）：`heat_group` 1 条 + `heat_member` 4 条（篮球项目误产生）、
+      4 个名为「测试篮球」但 `event_type=TRACK` 的 `event_item`（id 76–79）
+- [ ] `track-algorithms.js` 现只剩 2 个函数且与 `trackArrange.js` 能力重叠，
+      P1 统一路径后应整体并入 `trackArrange.js`，本文件作废
 
 - [ ] 移动端（手机）上的甘特图拖拽体验未实测，仅桌面端验证过
 - [ ] 服务器上的 dist 与 GitHub 源码尚未建立自动同步，改完代码要手动推一次

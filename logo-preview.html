@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logo 方案比选 · 校园体育竞赛管理系统</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 32px 64px;
+    font-family: MiSans, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F7F8FA; color: #1A1A1A; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; letter-spacing: .3px; }
+  .sub { font-size: 13px; color: #6B7280; margin: 0 0 32px; line-height: 1.7; }
+  .sub code { background: #ECEEF2; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .card { background: #fff; border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden; }
+
+  .card-head { padding: 18px 20px 0; display: flex; align-items: baseline; gap: 10px; }
+  .tag { font-size: 11px; font-weight: 600; color: #0052D9; background: #EAF1FE; padding: 2px 8px; border-radius: 5px; }
+  .card-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card-head .for { font-size: 12px; color: #9CA3AF; margin-left: auto; }
+
+  .stage { display: flex; align-items: center; justify-content: center; gap: 40px; padding: 28px 20px 24px; }
+  .stage .big { width: 120px; height: 120px; }
+
+  .sizes { display: flex; align-items: flex-end; gap: 22px; padding: 0 20px 20px; }
+  .sz { text-align: center; }
+  .sz svg { display: block; margin: 0 auto 6px; }
+  .sz span { font-size: 10px; color: #9CA3AF; }
+
+  .on-dark { background: #10141C; padding: 16px 20px; display: flex; align-items: center; gap: 18px; }
+  .on-dark span { font-size: 11px; color: #8B93A1; margin-left: auto; }
+  .on-dark svg { display: block; }
+
+  .desc { padding: 14px 20px 18px; font-size: 12.5px; color: #5B6472; line-height: 1.75; border-top: 1px dashed #EEF0F3; }
+  .desc b { color: #1A1A1A; font-weight: 600; }
+
+  /* 模拟真实界面 */
+  .sim-title { font-size: 15px; font-weight: 600; margin: 44px 0 16px; }
+  .sims { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .sim { border: 1px solid #E5E7EB; border-radius: 14px; overflow: hidden; background: #fff; }
+  .sim-label { font-size: 11px; color: #9CA3AF; padding: 10px 16px; border-bottom: 1px solid #F1F3F5; background: #FCFCFD; }
+
+  .side { display: flex; }
+  .side-bar { width: 200px; background: #fff; border-right: 1px solid #E5E7EB; padding: 16px 14px; }
+  .side-top { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; }
+  .side-top svg { width: 26px; height: 26px; }
+  .side-top div { font-size: 13px; font-weight: 600; line-height: 1.25; }
+  .side-top div small { display: block; font-size: 10px; color: #9CA3AF; font-weight: 400; margin-top: 1px; }
+  .side-item { font-size: 12.5px; color: #5B6472; padding: 8px 10px; border-radius: 7px; margin-bottom: 2px; }
+  .side-item.on { background: #EAF1FE; color: #0052D9; font-weight: 600; }
+  .side-body { flex: 1; padding: 22px; background: #F7F8FA; }
+  .side-body .ph { height: 11px; background: #E9ECF1; border-radius: 4px; margin-bottom: 11px; }
+  .side-body .ph.w60 { width: 60%; }
+  .side-body .ph.w80 { width: 80%; }
+  .side-body .ph.w40 { width: 40%; }
+
+  .browser { padding: 0; }
+  .tabbar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: #EDEFF3; }
+  .tab { display: flex; align-items: center; gap: 7px; background: #fff; border-radius: 8px 8px 0 0; padding: 6px 14px 6px 10px; font-size: 12px; color: #374151; }
+  .tab svg { width: 15px; height: 15px; }
+  .tab.active { color: #111; font-weight: 500; }
+
+  .login { display: flex; min-height: 210px; }
+  .login-brand { flex: 0 0 45%; background: #0052D9; color: #fff; padding: 26px 24px; display: flex; flex-direction: column; }
+  .login-brand .top { display: flex; align-items: center; gap: 11px; }
+  .login-brand .top svg { width: 40px; height: 40px; }
+  .login-brand .top b { font-size: 15px; display: block; }
+  .login-brand .top small { font-size: 11px; opacity: .75; }
+  .login-brand h3 { font-size: 19px; font-weight: 600; margin: auto 0 10px; line-height: 1.5; }
+  .login-brand p { font-size: 11.5px; opacity: .8; margin: 0; line-height: 1.7; }
+  .login-form { flex: 1; padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  .login-form .inp { height: 34px; border: 1px solid #E5E7EB; border-radius: 8px; }
+  .login-form .btn { height: 34px; border-radius: 8px; background: #0052D9; }
+
+  .note { margin-top: 40px; padding: 18px 20px; background: #fff; border: 1px solid #E5E7EB; border-left: 3px solid #0052D9; border-radius: 0 10px 10px 0; font-size: 12.5px; color: #5B6472; line-height: 1.85; }
+  .note b { color: #1A1A1A; }
+  .note code { background: #F1F3F5; padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+
+  @media (max-width: 900px) {
+    .grid, .sims { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <symbol id="logoA" viewBox="0 0 64 64"><title>方案 A · 奖杯与跑道</title>
+  <rect width="64" height="64" rx="15" fill="#0052D9"/>
+  <path d="M12 56 C12 44 21 38 32 38 C43 38 52 44 52 56" fill="none" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="3" stroke-linecap="round"/>
+  <path d="M19 56 C19 47 25 43 32 43 C39 43 45 47 45 56" fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M25 10 H39 V19 C39 23 35.9 26 32 26 C28.1 26 25 23 25 19 Z" fill="#FFC53D"/>
+  <path d="M25 13 H21.5 C19.6 13 18 14.6 18 16.5 C18 18.4 19.6 20 21.5 20 H25" fill="none" stroke="#FFC53D" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M39 13 H42.5 C44.4 13 46 14.6 46 16.5 C46 18.4 44.4 20 42.5 20 H39" fill="none" stroke="#FFC53D" stroke-width="2.4" stroke-linecap="round"/>
+  <rect x="30.5" y="26" width="3" height="5" fill="#FFC53D"/>
+  <rect x="25" y="31" width="14" height="4" rx="2" fill="#FFC53D"/></symbol>
+  <symbol id="logoB" viewBox="0 0 64 64"><title>方案 B · 冲刺与终点线</title>
+  <rect width="64" height="64" rx="15" fill="#0052D9"/>
+  <circle cx="28.5" cy="14.5" r="4.6" fill="#FFFFFF"/>
+  <path d="M27 21 L24 35" fill="none" stroke="#FFFFFF" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M26 25 L37 20.5" fill="none" stroke="#FFFFFF" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M26 25 L16.5 30" fill="none" stroke="#FFFFFF" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M24 35 L33 44 L31.5 53.5" fill="none" stroke="#FFFFFF" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 35 L15 42.5 L10.5 50" fill="none" stroke="#FFFFFF" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="45" y="9" width="5" height="5" fill="#FFFFFF"/>
+  <rect x="45" y="19" width="5" height="5" fill="#FFFFFF"/>
+  <rect x="45" y="29" width="5" height="5" fill="#FFFFFF"/>
+  <rect x="45" y="39" width="5" height="5" fill="#FFFFFF"/>
+  <rect x="45" y="49" width="5" height="5" fill="#FFFFFF"/>
+  <rect x="52" y="14" width="5" height="5" fill="#E34D59"/>
+  <rect x="52" y="24" width="5" height="5" fill="#E34D59"/>
+  <rect x="52" y="34" width="5" height="5" fill="#E34D59"/>
+  <rect x="52" y="44" width="5" height="5" fill="#E34D59"/></symbol>
+  <symbol id="logoC" viewBox="0 0 64 64"><title>方案 C · 奖牌与绶带</title>
+  <path d="M23 3 L29.5 3 L32 24 L26 24 Z" fill="#0052D9"/>
+  <path d="M34.5 3 L41 3 L38 24 L32 24 Z" fill="#4A8CF7"/>
+  <circle cx="32" cy="40" r="15" fill="#FFC53D"/>
+  <circle cx="32" cy="40" r="11" fill="#0052D9"/>
+  <path d="M32 33 L33.76 37.57 L38.66 37.84 L34.85 40.93 L36.12 45.66 L32 43 L27.89 45.66 L29.15 40.93 L25.34 37.84 L30.24 37.57 Z" fill="#FFFFFF"/></symbol>
+  <symbol id="logoD" viewBox="0 0 64 64"><title>方案 D · 盾徽与跑道</title>
+  <path d="M32 4 L54 12 V30 C54 43 44.5 53.5 32 58 C19.5 53.5 10 43 10 30 V12 Z" fill="#0052D9"/>
+  <path d="M32 33 L33.56 37.03 L37.88 37.29 L34.53 40.03 L35.65 44.22 L32 41.8 L28.35 44.22 L29.47 40.03 L26.12 37.29 L30.44 37.03 Z" fill="#FFC53D"/>
+  <path d="M16 50 C16 40 23 34 32 34 C41 34 48 40 48 50" fill="none" stroke="#FFFFFF" stroke-opacity="0.32" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M22 50 C22 43.5 26.4 39.5 32 39.5 C37.6 39.5 42 43.5 42 50" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+<div class="wrap">
+  <h1>Logo 方案比选</h1>
+  <p class="sub">
+    四套均为纯 SVG 矢量，主色取自系统主题 <code>--td-brand-color: #0052D9</code>，
+    辅色金 <code>#FFC53D</code>。下方同时给出 16px favicon 与深色背景下的真实观感。
+  </p>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="card-head"><span class="tag">A</span><h2>奖杯与跑道</h2><span class="for">最适合：通用主标</span></div>
+      <div class="stage"><img class="big" src="./frontend/public/logo-a-trophy.svg" alt="方案A"></div>
+      <div class="sizes">
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg><span>48</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg><span>32</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg><span>24</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg><span>16</span></div>
+      </div>
+      <div class="on-dark">
+        <svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg>
+        <svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg>
+        <span>深色背景</span>
+      </div>
+      <div class="desc"><b>表意最直接</b>：奖杯讲"竞赛"，两道弧线讲"跑道"。政务审美稳妥，各尺寸都不糊。缺点是这类图形用得多，辨识度一般。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="tag">B</span><h2>冲刺与终点线</h2><span class="for">最适合：学生端 / 大屏</span></div>
+      <div class="stage"><img class="big" src="./frontend/public/logo-b-sprint.svg" alt="方案B"></div>
+      <div class="sizes">
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoB"/></svg><span>48</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoB"/></svg><span>32</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoB"/></svg><span>24</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoB"/></svg><span>16</span></div>
+      </div>
+      <div class="on-dark">
+        <svg class="" viewBox="0 0 64 64"><use href="#logoB"/></svg>
+        <svg class="" viewBox="0 0 64 64"><use href="#logoB"/></svg>
+        <span>深色背景</span>
+      </div>
+      <div class="desc"><b>动感最强</b>：人形冲线 + 棋盘格终点带，一眼能读出"比赛"。红色终点线是全套里唯一的暖色点缀，适合放在大屏和公开页。16px 下细节会略有损失。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="tag">C</span><h2>奖牌与绶带</h2><span class="for">最适合：导航栏 / 白色底</span></div>
+      <div class="stage"><img class="big" src="./frontend/public/logo-c-medal.svg" alt="方案C"></div>
+      <div class="sizes">
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoC"/></svg><span>48</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoC"/></svg><span>32</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoC"/></svg><span>24</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoC"/></svg><span>16</span></div>
+      </div>
+      <div class="on-dark">
+        <svg class="" viewBox="0 0 64 64"><use href="#logoC"/></svg>
+        <svg class="" viewBox="0 0 64 64"><use href="#logoC"/></svg>
+        <span>深色背景</span>
+      </div>
+      <div class="desc"><b>唯一透明底的方案</b>，不带方块背景，放在白色侧边栏里更像"标志"而不是"App 图标"。金牌 + 绶带的语义直接指向"发奖"，但作为系统主标稍显窄。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="tag">D</span><h2>盾徽与跑道</h2><span class="for">最适合：教育局主标</span></div>
+      <div class="stage"><img class="big" src="./frontend/public/logo-d-shield.svg" alt="方案D"></div>
+      <div class="sizes">
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoD"/></svg><span>48</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoD"/></svg><span>32</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoD"/></svg><span>24</span></div>
+        <div class="sz"><svg class="" viewBox="0 0 64 64"><use href="#logoD"/></svg><span>16</span></div>
+      </div>
+      <div class="on-dark">
+        <svg class="" viewBox="0 0 64 64"><use href="#logoD"/></svg>
+        <svg class="" viewBox="0 0 64 64"><use href="#logoD"/></svg>
+        <span>深色背景</span>
+      </div>
+      <div class="desc"><b>最"官方"</b>：盾徽形状天然带权威感，金星 + 跑道兼顾荣誉与体育。如果这套系统要长期作为教育局的对外平台，这个最压得住。</div>
+    </div>
+
+  </div>
+
+  <div class="sim-title">放进真实界面看效果（以方案 A 示意）</div>
+  <div class="sims">
+    <div class="sim">
+      <div class="sim-label">侧边栏顶部 · 26px</div>
+      <div class="side">
+        <div class="side-bar">
+          <div class="side-top">
+            <svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg>
+            <div>体育竞赛管理<small>登封市教育局</small></div>
+          </div>
+          <div class="side-item on">赛事总览</div>
+          <div class="side-item">报名管理</div>
+          <div class="side-item">赛程编排</div>
+        </div>
+        <div class="side-body">
+          <div class="ph w40"></div>
+          <div class="ph w80"></div>
+          <div class="ph w60"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sim">
+      <div class="sim-label">浏览器标签页 favicon · 15px</div>
+      <div class="browser">
+        <div class="tabbar">
+          <div class="tab"><svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg>体育竞赛管理系统</div>
+          <div class="tab active">其他标签</div>
+        </div>
+        <div class="side-body" style="padding:26px;">
+          <div class="ph w60"></div>
+          <div class="ph w80"></div>
+          <div class="ph w40"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sim">
+    <div class="sim-label">登录页品牌区 · 40px</div>
+    <div class="login">
+      <div class="login-brand">
+        <div class="top">
+          <svg class="" viewBox="0 0 64 64"><use href="#logoA"/></svg>
+          <div><b>体育竞赛管理系统</b><small>School Sports Competition</small></div>
+        </div>
+        <h3>让每一场校运会<br>都排得清清楚楚</h3>
+        <p>报名、分组、编排、成绩、统计一站式完成</p>
+      </div>
+      <div class="login-form">
+        <div class="inp"></div>
+        <div class="inp"></div>
+        <div class="btn"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>选定后我会做这些改动</b><br>
+    ① 把选中方案复制为 <code>frontend/public/favicon.svg</code>（替换现有那个蓝色「竞」字方块，它用的 <code>#409eff</code> 和系统主色 <code>#0052D9</code> 其实并不一致）<br>
+    ② <code>Login.vue</code> 品牌区的 <code>.brand-logo</code> 换成图标<br>
+    ③ <code>Layout.vue</code> 侧边栏顶部换成图标<br>
+    ④ 需要的话再出一版<b>横式组合标</b>（图标 + 中文名一行排开），用于大屏页头和外发材料<br>
+    ⑤ 重新构建并同步内网机与腾讯云两处 dist
+  </div>
+</div>
+</body>
+</html>

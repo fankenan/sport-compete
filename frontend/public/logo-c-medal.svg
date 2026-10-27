@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img">
+  <title>方案 C · 奖牌与绶带</title>
+  <path d="M23 3 L29.5 3 L32 24 L26 24 Z" fill="#0052D9"/>
+  <path d="M34.5 3 L41 3 L38 24 L32 24 Z" fill="#4A8CF7"/>
+  <circle cx="32" cy="40" r="15" fill="#FFC53D"/>
+  <circle cx="32" cy="40" r="11" fill="#0052D9"/>
+  <path d="M32 33 L33.76 37.57 L38.66 37.84 L34.85 40.93 L36.12 45.66 L32 43 L27.89 45.66 L29.15 40.93 L25.34 37.84 L30.24 37.57 Z" fill="#FFFFFF"/>
+</svg>
