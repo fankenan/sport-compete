@@ -3,6 +3,7 @@
     <!-- 顶部标题条 -->
     <header class="sc-head">
       <div class="sc-title">
+        <img class="sc-logo" src="/logo-a-trophy.svg" alt="" />
         <h1>{{ sc ? sc.competition.name : (board.competition?.name || '赛事得分大屏') }}</h1>
         <span v-if="!sc && board.competition?.year" class="sc-year">{{ board.competition.year }}</span>
         <span v-else-if="sc?.competition?.venue" class="sc-year">{{ sc.competition.venue }}</span>
@@ -301,6 +302,20 @@ onUnmounted(() => {
   padding-bottom: 12px;
 }
 
+.sc-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sc-logo {
+  width: 36px;
+  height: 36px;
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.25));
+}
+
 .sc-title h1 {
   margin: 0;
   font-size: 30px;
@@ -308,7 +323,7 @@ onUnmounted(() => {
 }
 
 .sc-year {
-  margin-left: 10px;
+  margin-left: 0;
   font-size: 16px;
   color: #8fb6e8;
 }
@@ -466,6 +481,7 @@ onUnmounted(() => {
 @media (max-width: 900px) {
   .sc-body { grid-template-columns: 1fr; }
   .sc-title h1 { font-size: 22px; }
+  .sc-logo { width: 28px; height: 28px; }
   .li-when { display: none; }
 }
 

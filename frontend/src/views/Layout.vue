@@ -3,7 +3,7 @@
     <!-- PC 侧边栏 -->
     <aside class="sidebar" v-if="!isMobile">
       <div class="brand">
-        <div class="brand-mark">竞</div>
+        <img class="brand-mark" src="/logo-a-trophy.svg" alt="体育竞赛管理" />
         <div class="brand-text">
           <p class="brand-title">体育竞赛管理</p>
           <p class="brand-sub">{{ store.roleName }}端</p>
@@ -343,15 +343,9 @@ watch(() => store.competitionId, (v) => { compId.value = v; });
 .brand-mark {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-m);
-  background: linear-gradient(135deg, #366ef4, var(--td-brand-color));
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  font-weight: 600;
+  display: block;
   flex-shrink: 0;
+  border-radius: var(--radius-m);
   box-shadow: 0 2px 8px rgba(0, 82, 217, 0.4);
 }
 

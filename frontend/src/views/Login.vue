@@ -4,7 +4,7 @@
       <!-- 左侧品牌区（宽屏显示） -->
       <aside class="brand-panel">
         <div class="brand-top">
-          <div class="brand-logo">竞</div>
+          <img class="brand-logo" src="/logo-a-trophy.svg" alt="体育竞赛管理系统" />
           <div class="brand-name">
             <p class="bn-title">体育竞赛管理系统</p>
             <p class="bn-sub">Sports Competition Platform</p>
@@ -257,16 +257,11 @@ async function onSubmit({ validateResult }) {
 }
 
 .brand-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.16);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 500;
+  width: 40px;
+  height: 40px;
+  display: block;
   flex-shrink: 0;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.22));
 }
 
 .bn-title {
