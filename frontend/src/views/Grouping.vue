@@ -163,12 +163,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useUserStore } from '../store/user';
 import http from '../api/http';
 import { message, confirm } from '../utils/ui';
 import { bandLabel } from '../utils/band';
 
 const store = useUserStore();
+const router = useRouter();
 
 const events = ref([]);
 const bands = ref([]);
@@ -378,12 +380,24 @@ async function doTrackGenerate() {
     message.warning('请先选择项目');
     return;
   }
+  // 2026-10-27：本端点写入旧表 heat_group/heat_member，成绩录入页读的是 track_heat/heat_entry，
+  // 在这里生成的分组成绩录入页看不到。P1 统一路径前先做提示，行为保持不变。
+  try {
+    await confirm(
+      '这里生成的径赛分组，「成绩录入」页看不到 —— 两边用的不是同一套数据。\n建议改用「成绩录入 → 分组编排」。',
+      '建议改用成绩录入页',
+      { confirmBtn: '仍按旧方式生成', cancelBtn: '去成绩录入页' }
+    );
+  } catch (e) {
+    router.push('/track-result');
+    return;
+  }
   try {
     await http.post('/group/track-generate', {
       competition_id: store.competitionId,
       event_item_id: eventItemId.value
     });
-    message.success('径赛分组已生成');
+    message.success('径赛分组已生成（旧表，成绩录入页不可见）');
     loadGroups();
   } catch (e) {
     message.error(e.message);

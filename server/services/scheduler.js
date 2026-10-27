@@ -7,9 +7,10 @@ const { addMinutes, bandLabel } = require('../utils/helpers');
 const {
   bergerRotation, computeStanding, buildKnockoutPairing
 } = require('./schedule-algorithms');
+// 2026-10-27 清理：advanceFromHeats / standardSeedOrder / buildByeBracket 原先 import 了却从未调用，
+// 晋级实际走 trackArrange.pickAdvancers，发号走 TrackRace 号码簿。已移除。
 const {
-  decideRaceFormat, allocateHeats, advanceFromHeats,
-  standardSeedOrder, buildByeBracket
+  decideRaceFormat, allocateHeats
 } = require('./track-algorithms');
 
 /**

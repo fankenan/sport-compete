@@ -246,10 +246,19 @@ router.get('/group-standing', async (req, res, next) => {
 
 /**
  * 径赛分组生成
+ *
+ * ⚠️ 已弃用（2026-10-27）：本端点把分组写进 heat_group / heat_member（旧表），
+ *    而成绩录入页读的是 track_heat / heat_entry（新表），两边互不可见。
+ *    请改用 POST /track-result/arrange（前端「成绩录入 → 分组编排」）。
+ *    行为保持不变，仅打日志，待 P1 统一路径后移除。
  */
 router.post('/track-generate', roleRequired(1), async (req, res, next) => {
   try {
     const { competition_id, event_item_id } = req.body;
+    console.warn(
+      `[弃用] /group/track-generate 被调用（competition=${competition_id}, event_item=${event_item_id}）。` +
+      `该端点写入旧表 heat_group/heat_member，成绩录入页看不到；请改用 /track-result/arrange`
+    );
     const result = await scheduler.generateTrackHeats(competition_id, event_item_id);
     res.json(ok(result, `已生成 ${result.results.reduce((s, r) => s + r.heats, 0)} 个径赛分组`));
   } catch (e) { next(e); }

@@ -2,11 +2,14 @@
  * 赛程编排核心算法
  * 体育竞赛管理系统 · 实施设计 v3.0
  *
+ * 只放「不碰数据库的纯函数」；涉及落库 / 事务的编排逻辑一律在 scheduler.js。
+ * （2026-10-27 清理：generateSlots / packSchedule / advanceToKnockout 是早期原型，
+ *   线上实际跑的是 scheduler.js 里的同名实现，已从本文件移除）
+ *
  * 三个核心算法：
  *   1. bergerRotation    — 小组循环赛对阵轮转
  *   2. computeStanding   — 积分榜排序（含弃权与作废）
  *   3. buildKnockoutPairing — 淘汰赛首尾配对
- *   4. packSchedule      — 一天双赛时间槽装箱
  */
 
 // ============================================================
@@ -322,183 +325,6 @@ function buildKnockoutPairing(groupLetters, advanceCount) {
   return pairs;
 }
 
-// ============================================================
-// 四、一天双赛时间槽装箱
-// ============================================================
-
-/**
- * 生成一天的时间槽
- * @param {Object} cfg { amStart, pmStart, slotInterval, slotCount=10 }
- */
-function generateSlots(cfg) {
-  const { amStart, pmStart, slotInterval, slotCount = 10 } = cfg;
-  const half = Math.ceil(slotCount / 2);
-  const slots = [];
-
-  for (let i = 1; i <= slotCount; i++) {
-    const isPm = i > half;
-    const idxInHalf = isPm ? i - half : i - 1;
-    const base = isPm ? pmStart : amStart;
-    const start = addMinutes(base, idxInHalf * slotInterval);
-    slots.push({
-      slot_no: i,
-      half: isPm ? 'PM' : 'AM',
-      start_time: start,
-      end_time: addMinutes(start, slotInterval - 10) // 末段留换场缓冲
-    });
-  }
-  return slots;
-}
-
-function addMinutes(timeStr, minutes) {
-  const [h, m] = timeStr.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  const hh = Math.floor(total / 60);
-  const mm = total % 60;
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-}
-
-/**
- * 一天双赛装箱：同组两轮尽量排同一天（上午一槽 + 下午一槽）
- *
- * @param {Object} p
- * @param {Object[]} p.matches    小组赛场次（含 heat_group_id, round_no）
- * @param {Object[]} p.slots      generateSlots 产出
- * @param {Object[]} p.venues     场地数组
- * @param {Object[]} p.blocks     非比赛占位 [{venue_id, half, occupation}]
- * @returns {Object[]} 排好的 [{...match, slot_id, venue_id, start_time}]
- */
-function packSchedule(p) {
-  const { matches, slots, venues, blocks = [] } = p;
-
-  // 1. 非比赛占位先锁位（整列或单个半区）
-  const slotStatus = new Map();
-  const keyOf = (venueId, half) => `${venueId}|${half}`;
-
-  blocks.forEach((b) => {
-    const half = b.half ?? 'FULL';
-    slotStatus.set(keyOf(b.venue_id, half), b.occupation);
-    if (half === 'FULL') {
-      ['AM', 'PM'].forEach((h) => slotStatus.set(keyOf(b.venue_id, h), b.occupation));
-    }
-  });
-
-  // 2. 按小组归拢，组内按轮次排序
-  const byGroup = new Map();
-  matches.forEach((m) => {
-    if (!byGroup.has(m.heat_group_id)) byGroup.set(m.heat_group_id, []);
-    byGroup.get(m.heat_group_id).push(m);
-  });
-
-  const scheduled = [];
-
-  // 3. 逐组装箱：交替上下午，保证同组两轮在同一天
-  const usedSlots = new Set();
-  let venueCursor = 0; // 场地轮转指针
-
-  for (const [groupId, groupMatches] of byGroup) {
-    const rounds = groupMatches.sort((a, b) => a.round_no - b.round_no);
-
-    rounds.forEach((m, idx) => {
-      // 优先：与上一轮同组同日，上下午不同
-      const preferredHalf = idx % 2 === 0 ? 'AM' : 'PM';
-
-      // 从当前场地指针开始找可用槽
-      let placed = false;
-      for (let v = 0; v < venues.length && !placed; v++) {
-        const venueIdx = (venueCursor + v) % venues.length;
-        const venue = venues[venueIdx];
-
-        const candidates = slots.filter(
-          (s) => s.half === preferredHalf &&
-                 !slotStatus.has(keyOf(venue.id, s.half)) &&
-                 !usedSlots.has(`${venue.id}|${s.slot_no}`)
-        );
-
-        if (candidates.length > 0) {
-          const slot = candidates[0];
-          usedSlots.add(`${venue.id}|${slot.slot_no}`);
-          slotStatus.set(keyOf(venue.id, slot.half), `MATCH_${m.id}`);
-          scheduled.push({
-            ...m,
-            venue_id: venue.id,
-            slot_no: slot.slot_no,
-            start_time: slot.start_time,
-            end_time: slot.end_time
-          });
-          placed = true;
-        }
-      }
-
-      // 找不到精确半区则放宽到任意可用槽
-      if (!placed) {
-        for (const s of slots) {
-          const venue = venues[venueCursor % venues.length];
-          const k = `${venue.id}|${s.slot_no}`;
-          if (!slotStatus.has(keyOf(venue.id, s.half)) && !usedSlots.has(k)) {
-            usedSlots.add(k);
-            slotStatus.set(keyOf(venue.id, s.half), `MATCH_${m.id}`);
-            scheduled.push({
-              ...m,
-              venue_id: venue.id,
-              slot_no: s.slot_no,
-              start_time: s.start_time,
-              end_time: s.end_time
-            });
-            venueCursor++;
-            placed = true;
-            break;
-          }
-        }
-      }
-
-      if (!placed) {
-        // 无可用槽，标记待人工排期
-        scheduled.push({ ...m, unplaced: true });
-      }
-    });
-  }
-
-  return scheduled;
-}
-
-// ============================================================
-// 五、阶段自动推进
-// ============================================================
-
-/**
- * 小组赛打满 → 自动生成淘汰赛
- * @param {Object} p
- * @returns {Object[]} 新生成的场次
- */
-function advanceToKnockout(p) {
-  const { groupLetters, standingsByGroup, advanceCount, pairingRule, seqStart } = p;
-
-  let pairs;
-  if (pairingRule === 'ends') {
-    pairs = buildKnockoutPairing(groupLetters, advanceCount);
-  } else if (pairingRule === 'cross') {
-    // A1 vs B2, A2 vs B1
-    pairs = [];
-    for (let i = 0; i < Math.floor(advanceCount / 2); i++) {
-      pairs.push([groupLetters[i], groupLetters[i + 1 + i]]);
-    }
-  } else {
-    // direct：A1 vs B1, A2 vs B2
-    pairs = [];
-    for (let i = 0; i < advanceCount; i++) {
-      pairs.push([groupLetters[i], groupLetters[Math.floor(groupLetters.length / 2) + i]]);
-    }
-  }
-
-  return pairs.map(([gA, gB], i) => ({
-    seq_no: seqStart + i,
-    ref_a: `${gA}组第1`,
-    ref_b: `${gB}组第1`,
-    team_a_id: standingsByGroup[gA]?.rank1?.id ?? null,
-    team_b_id: standingsByGroup[gB]?.rank1?.id ?? null
-  }));
-}
 
 // ============================================================
 // 测试
@@ -542,15 +368,11 @@ function runTests() {
     console.log(`${g.length}组 →`, JSON.stringify(buildKnockoutPairing(g, adv)));
   });
 
-  console.log('\n===== 时间槽生成（小学 45 分钟间隔）=====');
-  const slots = generateSlots({ amStart: '08:30', pmStart: '13:30', slotInterval: 45 });
-  console.log('上午:', slots.filter((s) => s.half === 'AM').map((s) => s.start_time).join(' '));
-  console.log('下午:', slots.filter((s) => s.half === 'PM').map((s) => s.start_time).join(' '));
 }
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     bergerRotation, bergerByes, verifyRotation, computeStanding,
-    buildKnockoutPairing, generateSlots, packSchedule, advanceToKnockout, runTests
+    buildKnockoutPairing, runTests
   };
 }
