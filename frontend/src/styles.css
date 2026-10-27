@@ -1,0 +1,300 @@
+/* ============================================================
+   全局样式 · 设计令牌体系（Design Tokens）
+   —— 全站唯一样式来源，页面内禁止再写死色值/微调字号
+   ============================================================ */
+
+/* ---------- 1. 令牌：亮色 ---------- */
+:root {
+  /* 品牌（沿用 TDesign 默认蓝，可通过此一处换肤） */
+  --td-brand-color: #0052d9;
+  --td-brand-color-hover: #366ef4;
+  --td-brand-color-active: #0034b5;
+  --td-brand-color-light: #f2f3ff;
+
+  /* 功能色 */
+  --app-success: #2ba471;
+  --app-warning: #ed7b2f;
+  --app-error: #d54941;
+
+  /* 中性面 */
+  --app-bg: #f5f6f8;            /* 页面底 */
+  --app-bg-2: #f7f8fa;          /* 次级底（表头/工具条/hover） */
+  --app-surface: #ffffff;       /* 卡片面 */
+  --app-surface-2: #fbfcfd;     /* 卡片内嵌块 */
+  --app-sidebar-bg: #1c2536;
+  --app-sidebar-bg-2: #161d2b;
+
+  /* 中性线 */
+  --app-border: #e7e7e7;        /* 主分割 */
+  --app-border-2: #f0f0f0;      /* 弱分割（行分隔） */
+
+  /* 中性字 */
+  --app-text-1: rgba(0, 0, 0, 0.9);
+  --app-text-2: rgba(0, 0, 0, 0.6);
+  --app-text-3: rgba(0, 0, 0, 0.42);
+  --app-text-inverse: #ffffff;
+
+  /* 阴影（两档） */
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-2: 0 4px 16px rgba(16, 24, 40, 0.1);
+  --shadow-1-dark: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  /* 字号阶梯（只允许这些档位） */
+  --fs-10: 10px;  /* 角标 */
+  --fs-11: 11px;  /* 辅助说明 */
+  --fs-12: 12px;  /* 次要正文/标签 */
+  --fs-13: 13px;  /* 正文-表格 */
+  --fs-14: 14px;  /* 正文 */
+  --fs-16: 16px;  /* 卡片标题 */
+  --fs-20: 20px;  /* 页面标题 */
+  --fs-26: 26px;  /* 指标数字 */
+  --fs-34: 34px;  /* 大屏数字 */
+
+  /* 圆角 */
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 10px;
+
+  /* 间距（4px 基准网格） */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.15s;
+  --dur-mid: 0.25s;
+}
+
+/* ---------- 2. 令牌：暗色 ---------- */
+[theme-mode="dark"] {
+  --app-bg: #11151c;
+  --app-bg-2: #191f29;
+  --app-surface: #1b222e;
+  --app-surface-2: #212936;
+  --app-sidebar-bg: #151a23;
+  --app-sidebar-bg-2: #10141b;
+
+  --app-border: #2e3644;
+  --app-border-2: #262d39;
+
+  --app-text-1: rgba(255, 255, 255, 0.9);
+  --app-text-2: rgba(255, 255, 255, 0.6);
+  --app-text-3: rgba(255, 255, 255, 0.4);
+
+  --shadow-1: var(--shadow-1-dark);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- 3. 基础 ---------- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--app-text-1);
+  font-family: MiSans, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei UI",
+    "Microsoft YaHei", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-mid) ease, color var(--dur-mid) ease;
+}
+
+/* ---------- 4. 数字排版：表格成绩列对齐 ---------- */
+.t-table,
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ---------- 5. 表格密度与质感 ---------- */
+.t-table td,
+.t-table th {
+  border-color: var(--app-border-2);
+}
+
+.t-table th {
+  background: var(--app-bg-2);
+  color: var(--app-text-2);
+  font-weight: 500;
+}
+
+.t-table tr {
+  transition: background var(--dur-fast) ease;
+}
+
+/* ---------- 6. 卡片：去灰边，用浅阴影分层 ---------- */
+.t-card {
+  border-radius: var(--radius-l);
+  border: none;
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur-mid) var(--ease-out),
+    transform var(--dur-mid) var(--ease-out);
+  background: var(--app-surface);
+}
+
+.t-card--hover:hover {
+  box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+}
+
+/* ---------- 7. 路由切换动画 ---------- */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.22s var(--ease-out), transform 0.22s var(--ease-out);
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* ---------- 8. 列表入场（卡片/行级 stagger） ---------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.4s var(--ease-out) backwards;
+}
+
+.stagger > * {
+  animation: rise-in 0.45s var(--ease-out) backwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.stagger > *:nth-child(8) { animation-delay: 0.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in,
+  .stagger > * {
+    animation: none;
+  }
+}
+
+/* ---------- 9. 弹窗 / 抽屉质感 ---------- */
+.t-dialog,
+.t-drawer {
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-2);
+}
+
+/* 窄屏下弹窗留边距 */
+@media (max-width: 768px) {
+  .t-dialog {
+    max-width: calc(100vw - 24px);
+    width: calc(100vw - 24px) !important;
+  }
+
+  .t-dialog__body {
+    padding: 16px;
+  }
+
+  .t-form__label {
+    font-size: 13px;
+  }
+}
+
+/* ---------- 10. 手机端赛事选择抽屉 ---------- */
+.comp-drawer .t-drawer__body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.comp-drawer .t-drawer__content {
+  padding: 0;
+}
+
+.comp-drawer .t-drawer {
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+}
+
+/* ---------- 11. 工具类 ---------- */
+.dim {
+  color: var(--app-text-3);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* ---------- 选项卡：导航与面板内容的呼吸感（全站 9 个 tabs 页统一生效） ---------- */
+.t-tabs .t-tabs__content {
+  padding-top: 16px;
+}
+.t-tabs .t-tab-panel .tb-row:first-child,
+.t-tabs .t-tab-panel .bar:first-child {
+  margin-top: 0;
+}
+
+/* 空状态升级：图标 + 文案 + 留白 */
+.app-empty {
+  text-align: center;
+  padding: 44px 0 40px;
+  color: var(--app-text-3);
+  font-size: 13px;
+}
+.app-empty .app-empty-icon {
+  font-size: 34px;
+  color: var(--app-text-3);
+  opacity: 0.55;
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* TDesign 表格空态：加留白和呼吸感 */
+.t-table__empty {
+  padding: 40px 0 36px;
+  color: var(--app-text-3);
+}
+
+/* 内容区页面级入场动画（配合路由 fade-slide） */
+.content > * {
+  animation: rise-in 0.35s var(--ease-out) backwards;
+}
+
+/* ---------- 12. 滚动条 ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(127, 137, 155, 0.35);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(127, 137, 155, 0.55);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
