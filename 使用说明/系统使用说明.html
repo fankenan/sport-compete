@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>校园体育竞赛管理系统 · 使用说明</title>
+<style>
+  :root {
+    --brand: #0052D9;
+    --brand-light: #EAF1FE;
+    --ink: #1A1A1A;
+    --ink-2: #4B5563;
+    --ink-3: #8B93A1;
+    --line: #E5E7EB;
+    --bg: #FFFFFF;
+    --bg-2: #F7F8FA;
+    --gold: #BA7517;
+    --red: #A32D2D;
+    --green: #0F6E56;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: MiSans, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 15px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== 布局 ===== */
+  .layout { display: flex; align-items: flex-start; }
+  .toc {
+    position: sticky; top: 0; flex: 0 0 268px;
+    height: 100vh; overflow-y: auto;
+    padding: 32px 18px 40px 26px;
+    border-right: 1px solid var(--line);
+    background: var(--bg-2);
+    font-size: 13px;
+  }
+  .toc-title {
+    font-size: 12px; font-weight: 600; letter-spacing: 1.4px;
+    color: var(--ink-3); margin: 0 0 14px;
+  }
+  .toc a {
+    display: block; padding: 6px 10px; border-radius: 6px;
+    color: var(--ink-2); text-decoration: none; line-height: 1.5;
+    border-left: 2px solid transparent;
+  }
+  .toc a:hover { background: #ECEEF2; color: var(--ink); }
+  .toc a.part {
+    font-weight: 600; color: var(--ink); margin-top: 14px;
+    font-size: 13.5px; border-left-color: var(--brand);
+    padding-left: 10px;
+  }
+  .toc a.part:first-of-type { margin-top: 0; }
+  .toc a.sec { padding-left: 22px; font-size: 12.8px; }
+
+  .doc { flex: 1; min-width: 0; padding: 0 56px 120px; max-width: 980px; }
+
+  /* ===== 封面 ===== */
+  .cover {
+    padding: 64px 0 40px; border-bottom: 1px solid var(--line); margin-bottom: 44px;
+  }
+  .cover h1 {
+    font-size: 34px; font-weight: 600; margin: 0 0 14px; letter-spacing: .5px; line-height: 1.3;
+  }
+  .cover .sub { font-size: 16px; color: var(--ink-2); margin: 0 0 22px; line-height: 1.7; }
+  .cover .meta { font-size: 13px; color: var(--ink-3); display: flex; gap: 20px; flex-wrap: wrap; }
+  .cover .meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* ===== 标题 ===== */
+  h2.part {
+    font-size: 13px; font-weight: 600; letter-spacing: 2px; color: var(--brand);
+    margin: 76px 0 8px; padding-bottom: 10px; border-bottom: 2px solid var(--brand);
+  }
+  h2.part:first-of-type { margin-top: 20px; }
+  h2.part + h3 { margin-top: 26px; }
+  h3 {
+    font-size: 22px; font-weight: 600; margin: 52px 0 14px;
+    scroll-margin-top: 24px; line-height: 1.4;
+  }
+  h3 .num { color: var(--brand); margin-right: 10px; font-variant-numeric: tabular-nums; }
+  h4 {
+    font-size: 16px; font-weight: 600; margin: 30px 0 10px; color: var(--ink);
+    scroll-margin-top: 24px;
+  }
+  p { margin: 0 0 14px; }
+  strong { font-weight: 600; }
+  code {
+    background: #F1F3F5; padding: 1.5px 6px; border-radius: 4px;
+    font-size: 13.2px; font-family: "SFMono-Regular", Consolas, monospace;
+    color: #B5404B;
+  }
+
+  /* ===== 表格 ===== */
+  table {
+    width: 100%; border-collapse: collapse; margin: 18px 0 22px;
+    font-size: 13.6px; line-height: 1.7;
+  }
+  th {
+    text-align: left; font-weight: 600; background: var(--bg-2);
+    padding: 10px 12px; border-bottom: 1.5px solid var(--line);
+    color: var(--ink); white-space: nowrap;
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid #F1F3F5; vertical-align: top; }
+  td code { font-size: 12.6px; }
+
+  /* ===== 提示块 ===== */
+  .tip, .warn, .note {
+    padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 18px 0 22px;
+    font-size: 14px; line-height: 1.8;
+  }
+  .tip { background: #F0F7F4; border-left: 3px solid var(--green); }
+  .warn { background: #FDF3F3; border-left: 3px solid var(--red); }
+  .note { background: var(--brand-light); border-left: 3px solid var(--brand); }
+  .tip b, .warn b, .note b { font-weight: 600; }
+
+  /* ===== 步骤 ===== */
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 18px 0 22px; }
+  ol.steps > li {
+    position: relative; padding: 0 0 18px 44px; counter-increment: s;
+    line-height: 1.8;
+  }
+  ol.steps > li::before {
+    content: counter(s);
+    position: absolute; left: 0; top: 3px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--brand); color: #fff;
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps > li:not(:last-child)::after {
+    content: ""; position: absolute; left: 12.5px; top: 32px; bottom: 2px;
+    width: 1px; background: #DDE3EC;
+  }
+  ol.steps > li b { font-weight: 600; }
+
+  /* ===== 图 ===== */
+  figure { margin: 26px 0 30px; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 12.5px; color: var(--ink-3); text-align: center;
+    margin-top: 10px; line-height: 1.6;
+  }
+  .fig-box {
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 22px 18px; background: #FCFCFD;
+  }
+
+  /* ===== 路径提示 ===== */
+  .path {
+    display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 7px;
+    padding: 7px 12px; font-size: 13.4px; margin: 6px 0 16px;
+  }
+  .path b { color: var(--brand); font-weight: 600; }
+  .path .sep { color: var(--ink-3); }
+
+  /* ===== 两栏卡片 ===== */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0 24px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: #fff;
+  }
+  .card h5 {
+    margin: 0 0 8px; font-size: 14.5px; font-weight: 600;
+  }
+  .card p { margin: 0; font-size: 13.6px; color: var(--ink-2); line-height: 1.75; }
+
+  /* ===== 打印 ===== */
+  @media print {
+    .toc { display: none; }
+    .doc { padding: 0; max-width: none; }
+    h3 { page-break-after: avoid; }
+    figure, table { page-break-inside: avoid; }
+    body { font-size: 11.5pt; }
+  }
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .doc { padding: 0 20px 80px; }
+    .cover h1 { font-size: 26px; }
+    .cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside class="toc">
+  <p class="toc-title">目 录</p>
+  <a class="part" href="#p1">第一篇　认识系统</a>
+  <a class="sec" href="#s1-1">1.1　能办哪些比赛</a>
+  <a class="sec" href="#s1-2">1.2　三种角色与权限</a>
+  <a class="sec" href="#s1-3">1.3　全流程一张图</a>
+  <a class="sec" href="#s1-4">1.4　登录与界面</a>
+
+  <a class="part" href="#p2">第二篇　赛前准备</a>
+  <a class="sec" href="#s2-1">2.1　新建赛事</a>
+  <a class="sec" href="#s2-2">2.2　设置组别</a>
+  <a class="sec" href="#s2-3">2.3　建立竞赛项目</a>
+  <a class="sec" href="#s2-4">2.4　配置场地</a>
+  <a class="sec" href="#s2-5">2.5　学校与账号</a>
+  <a class="sec" href="#s2-6">2.6　报名</a>
+  <a class="sec" href="#s2-7">2.7　审核报名</a>
+  <a class="sec" href="#s2-8">2.8　裁判安排</a>
+
+  <a class="part" href="#p3">第三篇　球类项目</a>
+  <a class="sec" href="#s3-1">3.1　球类参数怎么填</a>
+  <a class="sec" href="#s3-2">3.2　分组编排</a>
+  <a class="sec" href="#s3-3">3.3　生成小组赛程</a>
+  <a class="sec" href="#s3-4">3.4　赛程编排（甘特图）</a>
+  <a class="sec" href="#s3-5">3.5　赛中录入比分</a>
+  <a class="sec" href="#s3-6">3.6　积分榜</a>
+  <a class="sec" href="#s3-7">3.7　淘汰赛与对阵图</a>
+  <a class="sec" href="#s3-8">3.8　最终名次</a>
+
+  <a class="part" href="#p4">第四篇　田径项目</a>
+  <a class="sec" href="#s4-1">4.1　田径中心</a>
+  <a class="sec" href="#s4-2">4.2　评分表与达标标准</a>
+  <a class="sec" href="#s4-3">4.3　全能项目</a>
+  <a class="sec" href="#s4-4">4.4　日程与单元</a>
+  <a class="sec" href="#s4-5">4.5　冲突检测</a>
+  <a class="sec" href="#s4-6">4.6　分组与道次</a>
+  <a class="sec" href="#s4-7">4.7　赛中控台</a>
+  <a class="sec" href="#s4-8">4.8　成绩录入</a>
+  <a class="sec" href="#s4-9">4.9　晋级录取</a>
+  <a class="sec" href="#s4-10">4.10　秩序册</a>
+  <a class="sec" href="#s4-11">4.11　团体总分</a>
+  <a class="sec" href="#s4-12">4.12　达级与破纪录</a>
+  <a class="sec" href="#s4-13">4.13　奖状</a>
+
+  <a class="part" href="#p5">第五篇　对外发布</a>
+  <a class="sec" href="#s5-1">5.1　赛事大屏</a>
+  <a class="sec" href="#s5-2">5.2　公开查询页</a>
+
+  <a class="part" href="#p6">第六篇　四种场景实操</a>
+  <a class="sec" href="#s6-1">6.1　综合运动会</a>
+  <a class="sec" href="#s6-2">6.2　单项篮球联赛</a>
+  <a class="sec" href="#s6-3">6.3　单项田径运动会</a>
+  <a class="sec" href="#s6-4">6.4　乒羽单淘汰赛</a>
+
+  <a class="part" href="#p7">附录</a>
+  <a class="sec" href="#s7-1">A　参数速查表</a>
+  <a class="sec" href="#s7-2">B　常见问题</a>
+  <a class="sec" href="#s7-3">C　术语表</a>
+</aside>
+
+<main class="doc">
+
+<header class="cover">
+  <h1>校园体育竞赛管理系统<br>使用说明</h1>
+  <p class="sub">从建赛事到出成绩，把一届校运会、一场联赛的全过程装进一个系统。<br>适用于综合运动会与各类单项运动会，覆盖田径、篮球、足球、排球、乒乓球、羽毛球等项目。</p>
+  <div class="meta">
+    <span><b>版本</b>　v1.0</span>
+    <span><b>更新</b>　2026 年 10 月</span>
+    <span><b>编制</b>　登封市教育局 体卫艺科</span>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p1">第一篇　认识系统</h2>
+
+<h3 id="s1-1"><span class="num">1.1</span>能办哪些比赛</h3>
+
+<p>系统把比赛分成两大引擎，各自有独立的编排逻辑，可以在同一届赛事里同时使用，也可以只开其中一个。</p>
+
+<table>
+  <thead>
+    <tr><th style="width:120px">引擎</th><th style="width:220px">适用项目</th><th>核心能力</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>球类</strong></td>
+      <td>篮球、足球、排球、乒乓球、羽毛球、手球等一切<strong>两队／两人对抗</strong>的项目</td>
+      <td>分小组 → 单循环（贝格尔轮转）→ 小组积分 → 淘汰赛（首尾配对／交叉／对位）→ 决出 1–4 名。<br>支持主客场、平局、胜负积分自定义、三四名决赛。</td>
+    </tr>
+    <tr>
+      <td><strong>田径</strong></td>
+      <td>径赛（60/100/200/400/800/1500/3000 米、跨栏）、田赛（跳高、跳远、铅球、实心球）、接力、全能</td>
+      <td>按人数自动定赛次（预赛→复赛→决赛）→ 分道分组 → 道次编排 → 成绩录入与自动排名 → 晋级录取 → 达标认定 → 破纪录 → 团体总分。</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="cols">
+  <div class="card">
+    <h5>综合运动会</h5>
+    <p>一届赛事里既有田径又有球类。比如"秋季运动会"设 100 米、跳远、篮球、拔河。两套引擎在同一个赛事下并行，互不干扰，报名、场地、裁判、大屏都是共用的。</p>
+  </div>
+  <div class="card">
+    <h5>单项运动会</h5>
+    <p>只办一种。比如"高中篮球联赛""初中田径运动会""教职工乒乓球赛"。做法完全一样，只是建项目时只建一类，不用的模块不看即可。</p>
+  </div>
+</div>
+
+<div class="note">
+  <b>关键概念：项目（event_item）与组别（group_band）是两条独立的线。</b><br>
+  项目管"比什么"（100 米、篮球），组别管"谁和谁比"（小学男子组、初中女子组）。<br>
+  一个项目可以挂在多个组别下 —— 比如"100 米"在小学男子、小学女子、初中男子、初中女子各有一份成绩。
+</div>
+
+<h3 id="s1-2"><span class="num">1.2</span>三种角色与权限</h3>
+
+<p>系统里所有账号分三类，看到的菜单和能做的事不同。</p>
+
+<table>
+  <thead>
+    <tr><th style="width:110px">角色</th><th style="width:180px">账号从哪来</th><th>能做的事</th><th style="width:200px">左侧导航项数</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>管理员</strong><br><span style="color:var(--ink-3);font-size:12.5px">role 1</span></td>
+      <td>系统内置，教育局／组委会持有</td>
+      <td>全部功能：建赛事、配项目场地、管学校账号、审核报名、编排赛程、录成绩、出统计</td>
+      <td>16 项 / 5 组</td>
+    </tr>
+    <tr>
+      <td><strong>学校</strong><br><span style="color:var(--ink-3);font-size:12.5px">role 2</span></td>
+      <td>管理员在「学校与账号」里为每所学校创建</td>
+      <td>给自己学校报名、查看审核结果、看积分榜与名次表</td>
+      <td>4 项（平铺）</td>
+    </tr>
+    <tr>
+      <td><strong>裁判</strong><br><span style="color:var(--ink-3);font-size:12.5px">role 3</span></td>
+      <td>管理员在「赛中控台 → 裁判员账号」里创建</td>
+      <td>录入本场成绩、查看自己的赛程、查积分与名次</td>
+      <td>5 项（平铺）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="tip">
+  <b>为什么裁判端也要能看积分榜和名次表？</b><br>
+  现场经常有领队、教练来问"我们队现在几分、排第几"，裁判自己能查就不用层层找组委会。
+</div>
+
+<h3 id="s1-3"><span class="num">1.3</span>全流程一张图</h3>
+
+<p>不管办什么比赛，都是下面这六个阶段。区别只在于<strong>第 4、5 步用哪套引擎</strong>。</p>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 860 330" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>赛事全流程六阶段</title>
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#8B93A1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="40" width="240" height="86" rx="10" fill="#EAF1FE" stroke="#0052D9" stroke-width="1"/>
+      <text x="36" y="66" font-size="13" font-weight="600" fill="#0052D9" font-family="sans-serif">1　建赛事</text>
+      <text x="36" y="88" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">赛事名称、年份、起止日期</text>
+      <text x="36" y="108" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">主办／承办单位、比赛地点</text>
+
+      <rect x="310" y="40" width="240" height="86" rx="10" fill="#EAF1FE" stroke="#0052D9" stroke-width="1"/>
+      <text x="326" y="66" font-size="13" font-weight="600" fill="#0052D9" font-family="sans-serif">2　定规则</text>
+      <text x="326" y="88" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">建组别（学段＋男女）</text>
+      <text x="326" y="108" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">建项目、配场地、设赛制</text>
+
+      <rect x="600" y="40" width="240" height="86" rx="10" fill="#EAF1FE" stroke="#0052D9" stroke-width="1"/>
+      <text x="616" y="66" font-size="13" font-weight="600" fill="#0052D9" font-family="sans-serif">3　报名审核</text>
+      <text x="616" y="88" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">学校端报名 / 管理员代报</text>
+      <text x="616" y="108" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">逐条或批量审核</text>
+
+      <path d="M264 83 L306 83" fill="none" stroke="#8B93A1" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M554 83 L596 83" fill="none" stroke="#8B93A1" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M720 130 L720 168 L140 168 L140 200" fill="none" stroke="#8B93A1" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="20" y="204" width="240" height="86" rx="10" fill="#F0F7F4" stroke="#0F6E56" stroke-width="1"/>
+      <text x="36" y="230" font-size="13" font-weight="600" fill="#0F6E56" font-family="sans-serif">4　编排</text>
+      <text x="36" y="252" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">球类：分组 → 小组赛 → 排期</text>
+      <text x="36" y="272" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">田径：分组道次 → 日程单元</text>
+
+      <rect x="310" y="204" width="240" height="86" rx="10" fill="#F0F7F4" stroke="#0F6E56" stroke-width="1"/>
+      <text x="326" y="230" font-size="13" font-weight="600" fill="#0F6E56" font-family="sans-serif">5　比赛</text>
+      <text x="326" y="252" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">球类：录比分、看积分榜</text>
+      <text x="326" y="272" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">田径：检录、录成绩、晋级</text>
+
+      <rect x="600" y="204" width="240" height="86" rx="10" fill="#F0F7F4" stroke="#0F6E56" stroke-width="1"/>
+      <text x="616" y="230" font-size="13" font-weight="600" fill="#0F6E56" font-family="sans-serif">6　出结果</text>
+      <text x="616" y="252" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">名次表、团体总分、秩序册</text>
+      <text x="616" y="272" font-size="12.5" fill="#1A1A1A" font-family="sans-serif">奖状、大屏、公开查询</text>
+
+      <path d="M264 247 L306 247" fill="none" stroke="#8B93A1" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M554 247 L596 247" fill="none" stroke="#8B93A1" stroke-width="1.6" marker-end="url(#ar)"/>
+    </svg>
+  </div>
+  <figcaption>图 1-1　赛事全流程。前三步球类与田径完全一样，第 4 步开始分岔</figcaption>
+</figure>
+
+<h3 id="s1-4"><span class="num">1.4</span>登录与界面</h3>
+
+<ol class="steps">
+  <li>浏览器打开系统地址，输入<b>账号</b>和<b>密码</b>登录。手机、电脑、平板都能用，不需要装 App。</li>
+  <li>登录后左侧是导航，<b>按赛事全流程分成六组</b>：总览 → 赛事组织 → 球类项目 → 田径项目 → 赛事发布 → 个人。</li>
+  <li>侧边栏最下方显示<b>当前赛事</b>。所有操作都在当前选中的赛事下进行，换赛事要点这里切换。</li>
+  <li>右上角有<b>明暗主题切换</b>。投影、大屏建议用暗色，打印材料用亮色。</li>
+</ol>
+
+<div class="warn">
+  <b>新手最容易犯的错：赛事选错了。</b><br>
+  建完新赛事后，一定要在侧边栏底部把"当前赛事"切过去，否则你在旧赛事里操作，会觉得"怎么建的东西都不见了"。
+</div>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p2">第二篇　赛前准备</h2>
+
+<p>这一篇讲的内容<strong>球类和田径都要做</strong>，顺序不能乱：先有赛事，才有组别和项目；先有项目，才能报名。</p>
+
+<h3 id="s2-1"><span class="num">2.1</span>新建赛事</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>赛事管理<span class="sep">›</span>新建</div>
+
+<table>
+  <thead><tr><th style="width:150px">字段</th><th>怎么填</th></tr></thead>
+  <tbody>
+    <tr><td>赛事名称</td><td>写全称，会出现在秩序册封面、大屏标题、公开页和参赛证上。例：<code>登封市 2026 年中小学生秋季运动会</code></td></tr>
+    <tr><td>年份</td><td>四位数字，用于归档和筛选</td></tr>
+    <tr><td>学段</td><td>不限 / 小学 / 初中 / 高中。跨学段的综合运动会选<b>"不限"</b>，具体分学段靠"组别"来分</td></tr>
+    <tr><td>起止日期</td><td>决定日程能排在哪几天，后面的"按赛期生成单元"要用</td></tr>
+    <tr><td>主办／承办单位</td><td>会印在秩序册和奖状上</td></tr>
+    <tr><td>比赛地点</td><td>大屏和公开页都会显示</td></tr>
+    <tr><td>联系人／电话</td><td>公示用，报名出问题时学校能找到人</td></tr>
+  </tbody>
+</table>
+
+<div class="tip">
+  <b>一个赛事办完不要删，留着。</b>下一年办新一届时，参考去年的组别和项目设置，比从零建快得多。
+</div>
+
+<h3 id="s2-2"><span class="num">2.2</span>设置组别</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>项目与场地<span class="sep">›</span>组别管理</div>
+
+<p>组别 = <strong>学段 + 性别</strong>。系统里每个组别都有一个简称，报名、编排、成绩、积分榜全按组别分开算。</p>
+
+<table>
+  <thead><tr><th style="width:120px">学段</th><th style="width:90px">性别</th><th>建议简称</th></tr></thead>
+  <tbody>
+    <tr><td>小学</td><td>男 / 女</td><td>男小 / 女小</td></tr>
+    <tr><td>初中</td><td>男 / 女</td><td>男初 / 女初</td></tr>
+    <tr><td>高中</td><td>男 / 女</td><td>男高 / 女高</td></tr>
+  </tbody>
+</table>
+
+<p>同一学段同一性别如果<strong>队伍太多</strong>（比如初中男子篮球报了 20 支队），可以拆成 A／B 两个组别，简称写成"男初A""男初B"。拆组后小组赛在每个组内打，淘汰赛再合并 —— 这就是系统里"分组"和"组别"的区别。</p>
+
+<div class="note">
+  <b>组别 ≠ 分组</b><br>
+  组别是赛前就定好的参赛资格划分（谁能报）；分组是编排时系统把报名的队伍随机或按种子切成 A 组、B 组（怎么打）。<br>
+  先有组别，报名完成后再分组。
+</div>
+
+<h3 id="s2-3"><span class="num">2.3</span>建立竞赛项目</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>项目与场地<span class="sep">›</span>竞赛项目<span class="sep">›</span>新建</div>
+
+<p>项目分三类（系统里叫 <code>category</code>），<strong>选错类别会导致后面的参数全变</strong>：</p>
+
+<table>
+  <thead><tr><th style="width:90px">类别</th><th style="width:180px">举例</th><th>关键参数</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>径赛</strong></td>
+      <td>100 米、800 米、100 米栏、4×100 米接力</td>
+      <td>道次数（默认 8）、超过多少人加复赛（默认 16）</td>
+    </tr>
+    <tr>
+      <td><strong>田赛</strong></td>
+      <td>跳高、跳远、铅球、实心球</td>
+      <td>计量单位（米）、成绩是越大越好、试跳／试投次数</td>
+    </tr>
+    <tr>
+      <td><strong>球类</strong></td>
+      <td>篮球、足球、排球、乒乓球、羽毛球</td>
+      <td>单场时长、时间槽间隔、分几组、每组几轮、几个进淘汰赛、配对方式、是否打三四名、是否允许平局、胜负积分</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>批量建项目：用模板库</h4>
+
+<p>田径项目一个个建很慢。系统有<strong>项目模板库</strong>，点「从模板库批量添加」，勾选需要的项目（100 米、200 米、跳远、铅球……），一次全部建好，单位、成绩类型、是否越大越好这些参数都自动带过来。</p>
+
+<div class="tip">
+  <b>建议做法：</b>先把本地规程里所有项目在「田径中心 → 项目模板库」维护成一套模板，以后每届运动会直接导入，只改需要改的个别项。
+</div>
+
+<h3 id="s2-4"><span class="num">2.4</span>配置场地</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>项目与场地<span class="sep">›</span>场地管理</div>
+
+<p>场地是赛程甘特图的<strong>列</strong>。有几块场地，甘特图就有几列。填写的要点：</p>
+
+<ul>
+  <li><strong>场地名称</strong>：写清楚位置，比如"1 号篮球场""田径场内场""体育馆二楼"</li>
+  <li><strong>场地编号</strong>：决定在日程表里的先后顺序，田径场一般排 1 号</li>
+  <li><strong>设在校内</strong>：如果场地在某所学校里，选上这所学校</li>
+</ul>
+
+<div class="warn">
+  <b>场地别漏建。</b>比赛当天临时加场地很麻烦 —— 已经排好的时间槽全要重排。宁可多建两个备用场地，不用时不排就行。
+</div>
+
+<h3 id="s2-5"><span class="num">2.5</span>学校与账号</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>学校与账号</div>
+
+<p>这个页面管两件事：<strong>参赛学校名单</strong>和<strong>各校的登录账号</strong>。</p>
+
+<ol class="steps">
+  <li>先建<b>学校</b>：填学校名称、简称、编号。简称会用在秩序册、大屏、成绩单上，建议统一成 2–4 字（如"嵩阳""市直一初中"）。</li>
+  <li>给每所学校建<b>账号</b>：系统会生成一个初始密码，管理员能看到，转告给学校即可。</li>
+  <li>学校忘记密码时，在这里点<b>「重置密码」</b>，不用删号重建。</li>
+  <li>比赛结束后可以<b>停用账号</b>，账号还在，但登不进去。</li>
+</ol>
+
+<div class="tip">
+  <b>账号命名建议：</b>用学校拼音首字母 + 年份，比如 <code>syxx2026</code>。一眼能看出是哪个学校、哪一年，明年不会和今年的混。
+</div>
+
+<h3 id="s2-6"><span class="num">2.6</span>报名</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>报名管理</div>
+
+<p><strong>球类</strong>和<strong>田径</strong>的报名方式是两套，页面上有两个标签页：</p>
+
+<div class="cols">
+  <div class="card">
+    <h5>球队报名（球类）</h5>
+    <p>一支队一条记录。填：所属组别、报名项目、队伍名称、领队、教练、联系电话。<br>一个学校在同一组别同一项目只能报一支队（系统会拦重复）。</p>
+  </div>
+  <div class="card">
+    <h5>个人报名（田径）</h5>
+    <p>一个运动员一条记录，可以报多个项目。<br>要填：姓名、性别、班级、出生年月、身份证号、参赛项目。<br>系统会按身份证号<b>自动算出出生年月</b>，不用手填。</p>
+  </div>
+</div>
+
+<h4>谁来回填？两种模式</h4>
+
+<table>
+  <thead><tr><th style="width:150px">模式</th><th>做法</th><th style="width:200px">适合</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>学校自报</strong></td>
+      <td>把账号发给各校，学校登录后自己填，管理员只审核</td>
+      <td>参赛学校多、项目多的大中型运动会</td>
+    </tr>
+    <tr>
+      <td><strong>管理员代报</strong></td>
+      <td>收各校 Excel／纸质报名表，管理员统一录入</td>
+      <td>学校少、或学校不熟悉系统时</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>报名进度怎么看</h4>
+
+<p>「报名进度」标签页按学校列出：<strong>已报几项、待审核几项、已通过几项</strong>。催报名的时候看这个页面就知道谁还没交。</p>
+
+<h3 id="s2-7"><span class="num">2.7</span>审核报名</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>报名管理<span class="sep">›</span>待审核</div>
+
+<p>报名记录有三种状态：<strong>待审核 → 已通过 / 已驳回</strong>。</p>
+
+<ol class="steps">
+  <li>切到「待审核」标签，逐条看：组别对不对、项目对不对、有没有超项。</li>
+  <li>没问题的点<b>「通过」</b>；有问题的点<b>「驳回」</b>，建议在备注里写清原因（如"该生已报 3 项，超过限报 2 项"）。</li>
+  <li>大部分都正常时，用<b>「批量通过」</b>一次过审，只把异常的挑出来单独处理。</li>
+  <li><strong>只有"已通过"的报名才会进入分组和编排。</strong>没审的、驳回的都不参与。</li>
+</ol>
+
+<div class="warn">
+  <b>审核这一步不能跳。</b>报名没审完就去做分组编排，会出现"少了几支队""名单不全"，等审完再想补进去，小组赛得重新生成，之前排的赛程全废。
+</div>
+
+<h3 id="s2-8"><span class="num">2.8</span>裁判安排</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>裁判管理</div>
+
+<p>三个标签页：</p>
+
+<table>
+  <thead><tr><th style="width:130px">标签</th><th>做什么</th></tr></thead>
+  <tbody>
+    <tr><td><strong>裁判库</strong></td><td>录入所有裁判：姓名、单位、等级、能执裁的项目。一次录入，多届复用</td></tr>
+    <tr><td><strong>场次指派</strong></td><td>把裁判分到具体场次。可以一场一场派，也可以选中多个场次<b>批量指派</b></td></tr>
+    <tr><td><strong>组委会名单</strong></td><td>主任、副主任、委员、仲裁委员会、竞赛组、场地器材组、安全保障组、媒体宣传组……会印在秩序册首页</td></tr>
+  </tbody>
+</table>
+
+<div class="tip">
+  <b>裁判账号不在这里建。</b>要给裁判开登录账号，去「赛中控台 → 裁判员账号」。这里只管"谁执裁哪场"，不管"谁能登录"。
+</div>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p3">第三篇　球类项目</h2>
+
+<p>篮球、足球、排球、乒乓球、羽毛球的流程<strong>完全一样</strong>，区别只在「项目参数」里填的数字。所以这一篇先讲参数怎么填，再讲通用流程。</p>
+
+<h3 id="s3-1"><span class="num">3.1</span>球类参数怎么填</h3>
+
+<div class="path"><b>赛事组织</b><span class="sep">›</span>项目与场地<span class="sep">›</span>竞赛项目<span class="sep">›</span>编辑球类项目</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:130px">参数</th><th style="width:230px">含义</th><th>说明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>单场时长</strong></td><td>一场比赛占多少分钟</td><td>只影响排期估算，不影响实际比赛。填实际时长的近似值</td></tr>
+    <tr><td><strong>时间槽间隔</strong></td><td>同一场地相邻两场的起始间隔</td><td><b>必须 ≥ 单场时长</b>，否则会排成时间重叠。要留出换场、热身、记录的时间</td></tr>
+    <tr><td><strong>分几组</strong></td><td>小组赛分几个组</td><td>填 <code>0</code> 表示按报名队数自动定（一般 6 队以下 1 组，7–12 队 2 组，13 队以上 4 组）</td></tr>
+    <tr><td><strong>每组几轮</strong></td><td>小组内打几轮</td><td>填 <code>0</code> 表示按队数自动（单循环：n 队打 n−1 轮）</td></tr>
+    <tr><td><strong>几个进淘汰赛</strong></td><td>每组取前几名进淘汰赛</td><td>2 组 × 前 2 名 = 4 强；4 组 × 前 2 名 = 8 强</td></tr>
+    <tr><td><strong>配对方式</strong></td><td>淘汰赛第一轮怎么对</td><td><b>首尾配对</b>（A1-H1、B1-G1…，强弱分开，推荐）／<b>交叉配对</b>（A1-B2、A2-B1）／<b>对位配对</b>（A1-B1、A2-B2）</td></tr>
+    <tr><td><strong>是否打三四名</strong></td><td>半决赛负方要不要再打一场争第三</td><td>正式比赛建议打；时间紧可以不打，两队并列第三</td></tr>
+    <tr><td><strong>是否允许平局</strong></td><td>比分相同算不算平</td><td>足球、排球小组赛可允许；<b>篮球、乒乓球、羽毛球不能允许</b>（必须分出胜负，系统会拦"平局"录入）</td></tr>
+    <tr><td><strong>胜／平积分</strong></td><td>赢一场得几分、平一场得几分</td><td>见下方说明</td></tr>
+  </tbody>
+</table>
+
+<h4>各项目的建议值</h4>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:90px">项目</th><th style="width:90px">单场时长</th><th style="width:100px">槽间隔</th>
+      <th style="width:80px">允许平局</th><th style="width:110px">胜／平积分</th><th>备注</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>篮球</strong></td><td>40–50</td><td>50–60</td><td>否</td><td>2 / —</td><td>4×10 分钟净时，实际含暂停约 60 分钟，槽间隔给足</td></tr>
+    <tr><td><strong>足球</strong></td><td>40–60</td><td>60–80</td><td>是</td><td>3 / 1</td><td>小学 5 人制 40 分钟，初中 8 人制 60 分钟；中场休息要算进去</td></tr>
+    <tr><td><strong>排球</strong></td><td>45–60</td><td>60–70</td><td>否</td><td>2 / —</td><td>三局两胜，含热身约 60 分钟</td></tr>
+    <tr><td><strong>乒乓球</strong></td><td>20–30</td><td>30–35</td><td>否</td><td>2 / —</td><td>五局三胜最快 15 分钟，七局四胜约 30 分钟</td></tr>
+    <tr><td><strong>羽毛球</strong></td><td>30–40</td><td>40–45</td><td>否</td><td>2 / —</td><td>三局两胜约 35 分钟，含换场热身</td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  <b>一个必须知道的限制：系统里「负」固定为 0 分。</b><br>
+  所以中国篮协常用的 FIBA 两分制（<b>胜 2 分、负 1 分</b>）做不出来 —— 只能设成「胜 2 分、负 0 分」。<br>
+  对校园比赛来说名次结果一样（因为所有队都少 1 分，排序不变），只是"积分"这个数字对不上规程。<br>
+  如果规程明确要求写"积 2 分／1 分"，建议在积分榜截图旁附一句说明，或者直接用"胜场数"作为排名依据。
+</div>
+
+<h4>积分相同时怎么排？</h4>
+
+<p>系统按下面这个顺序依次比较，谁先分出高下就按谁排：</p>
+
+<ol class="steps">
+  <li><b>积分</b>高的在前</li>
+  <li>积分相同 → 看<b>两队之间的交手结果</b>（相互战绩的积分 → 净胜分 → 得分）</li>
+  <li>还相同 → 看<b>该组全部比赛的净胜分</b></li>
+  <li>还相同 → 看<b>全部比赛的得分</b></li>
+  <li>还相同 → <b>弃权次数少</b>的在前</li>
+  <li>最后仍相同 → 按队伍编号排（真并列）</li>
+</ol>
+
+<p>这是国际通行的"相互战绩优先"规则，比单纯比净胜分更公平 —— 避免了"两队默契做大比分"的情况。</p>
+
+<div class="note">
+  <b>弃权自动处理：</b>一场比赛标记弃权，该队记一场负；<b>同一队弃权满 2 次，该队全部成绩作废</b>（不参与积分和排名），其他队的相关场次也一并剔除。这条规则系统自动执行，不用手工算。
+</div>
+
+<h3 id="s3-2"><span class="num">3.2</span>分组编排</h3>
+
+<div class="path"><b>球类项目</b><span class="sep">›</span>分组编排</div>
+
+<ol class="steps">
+  <li>选择<b>项目</b>和<b>组别</b>（比如"篮球 · 初中男子"）。</li>
+  <li>点<b>「分组预览」</b>。这一步<b>不写入数据库</b>，只是让你看看按当前队数会分成几组、每组几队，以及每队会在哪一组。</li>
+  <li>看着不满意，可以调整「分几组」再预览。多人想换组？预览里可以拖。</li>
+  <li>确认无误后点<b>「执行分组」</b>，分组结果才正式落库。</li>
+  <li>分完之后，下方会显示<b>每个小组的成员名单</b>和<b>各组积分榜</b>（此时全是 0）。</li>
+</ol>
+
+<div class="tip">
+  <b>预览和执行是两步，别点错。</b>「分组预览」随便点，不会改数据；「执行分者」会真的分组，如果已经有小组赛程了，重新执行会冲突。分组定下来后要改，建议先删掉已有赛程再重分。
+</div>
+
+<h3 id="s3-3"><span class="num">3.3</span>生成小组赛程</h3>
+
+<p>分好组后，点<b>「生成小组赛程」</b>。系统用<strong>贝格尔轮转法</strong>自动排单循环对阵，保证：</p>
+
+<ul>
+  <li>每两支队伍<b>恰好交手一次</b>，不多不少</li>
+  <li>队伍数为偶数时，每轮所有队同时上场</li>
+  <li>队伍数为奇数时，每轮有一队<b>轮空</b>，且每队恰好轮空一次</li>
+</ul>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 860 250" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>贝格尔轮转法示例：4 支队伍 3 轮 6 场</title>
+      <text x="20" y="26" font-size="13" font-weight="600" fill="#1A1A1A" font-family="sans-serif">4 支队伍 → 3 轮，每轮 2 场，共 6 场</text>
+
+      <rect x="20" y="46" width="255" height="150" rx="9" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="38" y="72" font-size="12.5" font-weight="600" fill="#0052D9" font-family="sans-serif">第 1 轮</text>
+      <rect x="38" y="86" width="98" height="38" rx="6" fill="#fff" stroke="#DDE3EC"/>
+      <text x="87" y="110" text-anchor="middle" font-size="13" fill="#1A1A1A" font-family="sans-serif">1 队 vs 4 队</text>
+      <rect x="146" y="86" width="98" height="38" rx="6" fill="#fff" stroke="#DDE3EC"/>
+      <text x="195" y="110" text-anchor="middle" font-size="13" fill="#1A1A1A" font-family="sans-serif">2 队 vs 3 队</text>
+      <text x="38" y="150" font-size="11.5" fill="#8B93A1" font-family="sans-serif">1 号种子先碰最弱，避免强强早遇</text>
+
+      <rect x="293" y="46" width="255" height="150" rx="9" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="311" y="72" font-size="12.5" font-weight="600" fill="#0052D9" font-family="sans-serif">第 2 轮</text>
+      <rect x="311" y="86" width="98" height="38" rx="6" fill="#fff" stroke="#DDE3EC"/>
+      <text x="360" y="110" text-anchor="middle" font-size="13" fill="#1A1A1A" font-family="sans-serif">3 队 vs 1 队</text>
+      <rect x="419" y="86" width="98" height="38" rx="6" fill="#fff" stroke="#DDE3EC"/>
+      <text x="468" y="110" text-anchor="middle" font-size="13" fill="#1A1A1A" font-family="sans-serif">2 队 vs 4 队</text>
+      <text x="311" y="150" font-size="11.5" fill="#8B93A1" font-family="sans-serif">固定 1 队不动，其余逆时针轮转</text>
+
+      <rect x="566" y="46" width="255" height="150" rx="9" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="584" y="72" font-size="12.5" font-weight="600" fill="#0052D9" font-family="sans-serif">第 3 轮</text>
+      <rect x="584" y="86" width="98" height="38" rx="6" fill="#fff" stroke="#DDE3EC"/>
+      <text x="633" y="110" text-anchor="middle" font-size="13" fill="#1A1A1A" font-family="sans-serif">1 队 vs 2 队</text>
+      <rect x="692" y="86" width="98" height="38" rx="6" fill="#fff" stroke="#DDE3EC"/>
+      <text x="741" y="110" text-anchor="middle" font-size="13" fill="#1A1A1A" font-family="sans-serif">3 队 vs 4 队</text>
+      <text x="584" y="150" font-size="11.5" fill="#8B93A1" font-family="sans-serif">最后一轮，强强相碰决出名次</text>
+
+      <text x="20" y="228" font-size="11.5" fill="#8B93A1" font-family="sans-serif">规律：n 支队 → n−1 轮（奇数队 n 轮），总场次恒为 n(n−1)/2。5 队 → 5 轮 10 场，每队轮空 1 次；6 队 → 5 轮 15 场。</text>
+    </svg>
+  </div>
+  <figcaption>图 3-1　贝格尔轮转法。系统生成的顺序与上图一致，种子号小的队先打</figcaption>
+</figure>
+
+<h4>生成后会发生什么</h4>
+
+<ul>
+  <li>场次自动获得<b>全局场序</b>（跨项目连续编号，1、2、3…），方便广播念场次</li>
+  <li>每场记录所属小组、轮次、双方队伍</li>
+  <li>此时<b>还没有时间</b>和<b>场地</b>，只是"谁和谁打"，要等下一步排期</li>
+</ul>
+
+<h3 id="s3-4"><span class="num">3.4</span>赛程编排（甘特图）</h3>
+
+<div class="path"><b>球类项目</b><span class="sep">›</span>赛程编排</div>
+
+<p>这一步把"谁和谁打"排进<b>具体的时间 + 具体的场地</b>。界面是一张甘特图：<strong>横轴是日期和时刻，纵轴是场地</strong>。</p>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>赛程甘特图示意</title>
+      <text x="20" y="24" font-size="13" font-weight="600" fill="#1A1A1A" font-family="sans-serif">9 月 20 日（周六）　小学男子篮球</text>
+
+      <rect x="90" y="40" width="150" height="30" rx="5" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="165" y="60" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">1 号场</text>
+      <rect x="248" y="40" width="150" height="30" rx="5" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="323" y="60" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">2 号场</text>
+      <rect x="406" y="40" width="150" height="30" rx="5" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="481" y="60" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">3 号场</text>
+
+      <text x="20" y="88" font-size="12.5" fill="#4B5563" font-family="sans-serif">08:30</text>
+      <rect x="90" y="72" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="165" y="94" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">1 场｜嵩阳 vs 市直</text>
+      <rect x="248" y="72" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="323" y="94" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">2 场｜少林 vs 中岳</text>
+      <rect x="406" y="72" width="150" height="34" rx="5" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/>
+      <text x="481" y="94" text-anchor="middle" font-size="12" fill="#8B93A1" font-family="sans-serif">空槽</text>
+
+      <text x="20" y="132" font-size="12.5" fill="#4B5563" font-family="sans-serif">09:30</text>
+      <rect x="90" y="116" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="165" y="138" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">3 场｜阳城 vs 告成</text>
+      <rect x="248" y="116" width="150" height="34" rx="5" fill="#FDF3F3" stroke="#A32D2D"/>
+      <text x="323" y="138" text-anchor="middle" font-size="12" fill="#A32D2D" font-family="sans-serif">占位｜开幕式</text>
+      <rect x="406" y="116" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="481" y="138" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">4 场｜大冶 vs 卢店</text>
+
+      <text x="20" y="176" font-size="12.5" fill="#4B5563" font-family="sans-serif">10:30</text>
+      <rect x="90" y="160" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="165" y="182" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">5 场｜嵩阳 vs 少林</text>
+      <rect x="248" y="160" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="323" y="182" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">6 场｜市直 vs 中岳</text>
+      <rect x="406" y="160" width="150" height="34" rx="5" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/>
+      <text x="481" y="182" text-anchor="middle" font-size="12" fill="#8B93A1" font-family="sans-serif">空槽</text>
+
+      <text x="20" y="220" font-size="12.5" fill="#4B5563" font-family="sans-serif">14:00</text>
+      <rect x="90" y="204" width="150" height="34" rx="5" fill="#FDF3F3" stroke="#A32D2D"/>
+      <text x="165" y="226" text-anchor="middle" font-size="12" fill="#A32D2D" font-family="sans-serif">占位｜午休</text>
+      <rect x="248" y="204" width="150" height="34" rx="5" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="323" y="226" text-anchor="middle" font-size="12" fill="#0052D9" font-family="sans-serif">7 场｜阳城 vs 大冶</text>
+      <rect x="406" y="204" width="150" height="34" rx="5" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/>
+      <text x="481" y="226" text-anchor="middle" font-size="12" fill="#8B93A1" font-family="sans-serif">空槽</text>
+
+      <text x="20" y="272" font-size="11.5" fill="#8B93A1" font-family="sans-serif">蓝底＝已排比赛　灰虚线＝空槽（点一下可直接加比赛）　红底＝占位（开幕式／午休等不比赛的时段）</text>
+      <text x="20" y="292" font-size="11.5" fill="#8B93A1" font-family="sans-serif">点顶部时间可整段清除该时段所有场次；拖动场次可改时间或换场地</text>
+    </svg>
+  </div>
+  <figcaption>图 3-2　赛程甘特图。列＝场地，行＝时刻，格子＝一场比赛</figcaption>
+</figure>
+
+<h4>怎么把比赛排进去</h4>
+
+<p>两条路，看情况选：</p>
+
+<table>
+  <thead><tr><th style="width:150px">方式</th><th>操作</th><th style="width:180px">适合</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>自动排</strong></td>
+      <td>点「生成时间槽」→ 点「自动装箱」，系统把未排期的场次按小组和轮次自动塞进空槽</td>
+      <td>场次多、想快速出一版初稿</td>
+    </tr>
+    <tr>
+      <td><strong>手动排</strong></td>
+      <td>点<b>空槽</b>直接新建一场；或选一场比赛<b>拖</b>到目标格子里</td>
+      <td>有特殊要求（某队上午不能打、要留开幕式时间）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>甘特图上的几个手势</h4>
+
+<table>
+  <thead><tr><th style="width:170px">操作</th><th>效果</th></tr></thead>
+  <tbody>
+    <tr><td><b>点空槽</b></td><td>弹出"新增场次"，直接在该场地该时段加一场</td></tr>
+    <tr><td><b>点已有比赛</b></td><td>打开场次详情抽屉，可改时间、换场地、指派裁判、录入比分</td></tr>
+    <tr><td><b>拖动比赛</b></td><td>拖到别的格子＝改时间或换场地，松手即生效</td></tr>
+    <tr><td><b>点顶部时间</b></td><td>提示"是否清除该时段的全部比赛"，确认后<b>跨所有场地</b>清空这个时刻</td></tr>
+    <tr><td><b>添加占位</b></td><td>把某场地某时段标成"开幕式""午休"等，不参与比赛排期</td></tr>
+    <tr><td><b>清理空槽</b></td><td>删掉没用上的空时间槽，甘特图更清爽</td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  <b>清除时段会连带删掉已录的比分。</b>系统默认会拒绝清除"已有成绩"的时段，必须再点一次强制才删。清之前想清楚。
+</div>
+
+<div class="tip">
+  <b>排期心法：</b>先排<b>场地最紧张</b>的项目（比如只有一块篮球场，就把篮球先占满），再排场地宽裕的。同一个小组的两轮尽量排在同一天，减少队伍往返。
+</div>
+
+<h3 id="s3-5"><span class="num">3.5</span>赛中录入比分</h3>
+
+<p>有两个入口，都能录：</p>
+
+<div class="cols">
+  <div class="card">
+    <h5>赛程编排 → 点场次 → 录入</h5>
+    <p>管理员在甘特图上点开某场比赛，填双方比分、标记弃权、确认提交。适合集中录入。</p>
+  </div>
+  <div class="card">
+    <h5>我的赛程（裁判端）</h5>
+    <p>裁判登录后在手机上看自己当天的场次，点开录入。有<b>快捷胜负按钮</b>，点一下就填好胜负，比分仍可手改。适合现场边打边录。</p>
+  </div>
+</div>
+
+<h4>录入时要注意</h4>
+
+<ul>
+  <li><strong>比分是数字，不是"胜／负"</strong>。系统按比分大小自动判定胜负</li>
+  <li>如果项目设了<b>不允许平局</b>，填相同比分会提示错误，必须分出胜负（篮球进加时）</li>
+  <li>一方<b>弃权</b>要勾"弃权"，不是填 0:0 —— 填 0:0 会被当成平局，弃权的处理逻辑（记负、累计 2 次作废）不会触发</li>
+  <li>录错了可以<b>作废</b>该场重录，作废的比赛不参与积分</li>
+</ul>
+
+<h3 id="s3-6"><span class="num">3.6</span>积分榜</h3>
+
+<div class="path"><b>球类项目</b><span class="sep">›</span>积分榜</div>
+
+<p>每录一场，积分榜实时更新。页面有三个区块：</p>
+
+<h4>小组积分榜</h4>
+
+<p>每个小组一张表，列出：场次、胜、平、负、得分、失分、净胜分、积分、名次。弃权次数和"已作废"状态也会标出来。</p>
+
+<p>右上角有<b>「导出 CSV」</b>和<b>「打印」</b>，打印版式适合直接贴到公告栏。</p>
+
+<h4>对阵矩阵（交叉表）</h4>
+
+<p>一张 n×n 的方格表，<strong>横竖都是队伍，格子里是两队的比分</strong>。一眼能看出谁赢过谁、有没有漏打的场次。</p>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 620 250" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>对阵矩阵示意</title>
+      <text x="20" y="24" font-size="13" font-weight="600" fill="#1A1A1A" font-family="sans-serif">小组对阵矩阵（4 队单循环）</text>
+
+      <rect x="120" y="40" width="110" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="175" y="62" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">嵩阳</text>
+      <rect x="234" y="40" width="110" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="289" y="62" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">少林</text>
+      <rect x="348" y="40" width="110" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="403" y="62" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">市直</text>
+      <rect x="462" y="40" width="110" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="517" y="62" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">中岳</text>
+
+      <rect x="20" y="78" width="96" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="68" y="100" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">嵩阳</text>
+      <rect x="120" y="78" width="110" height="34" fill="#EDEDED" stroke="#E5E7EB"/>
+      <text x="175" y="100" text-anchor="middle" font-size="12" fill="#B4B2A9" font-family="sans-serif">—</text>
+      <rect x="234" y="78" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="289" y="100" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">48 : 35</text>
+      <rect x="348" y="78" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="403" y="100" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">52 : 40</text>
+      <rect x="462" y="78" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="517" y="100" text-anchor="middle" font-size="12.5" fill="#A32D2D" font-family="sans-serif">38 : 44</text>
+
+      <rect x="20" y="116" width="96" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="68" y="138" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">少林</text>
+      <rect x="120" y="116" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="175" y="138" text-anchor="middle" font-size="12.5" fill="#A32D2D" font-family="sans-serif">35 : 48</text>
+      <rect x="234" y="116" width="110" height="34" fill="#EDEDED" stroke="#E5E7EB"/>
+      <text x="289" y="138" text-anchor="middle" font-size="12" fill="#B4B2A9" font-family="sans-serif">—</text>
+      <rect x="348" y="116" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="403" y="138" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">46 : 41</text>
+      <rect x="462" y="116" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="517" y="138" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">50 : 49</text>
+
+      <rect x="20" y="154" width="96" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="68" y="176" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">市直</text>
+      <rect x="120" y="154" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="175" y="176" text-anchor="middle" font-size="12.5" fill="#A32D2D" font-family="sans-serif">40 : 52</text>
+      <rect x="234" y="154" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="289" y="176" text-anchor="middle" font-size="12.5" fill="#A32D2D" font-family="sans-serif">41 : 46</text>
+      <rect x="348" y="154" width="110" height="34" fill="#EDEDED" stroke="#E5E7EB"/>
+      <text x="403" y="176" text-anchor="middle" font-size="12" fill="#B4B2A9" font-family="sans-serif">—</text>
+      <rect x="462" y="154" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="517" y="176" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">55 : 43</text>
+
+      <rect x="20" y="192" width="96" height="34" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="68" y="214" text-anchor="middle" font-size="12.5" font-weight="600" fill="#4B5563" font-family="sans-serif">中岳</text>
+      <rect x="120" y="192" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="175" y="214" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">44 : 38</text>
+      <rect x="234" y="192" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="289" y="214" text-anchor="middle" font-size="12.5" fill="#A32D2D" font-family="sans-serif">49 : 50</text>
+      <rect x="348" y="192" width="110" height="34" fill="#fff" stroke="#E5E7EB"/>
+      <text x="403" y="214" text-anchor="middle" font-size="12.5" fill="#A32D2D" font-family="sans-serif">43 : 55</text>
+      <rect x="462" y="192" width="110" height="34" fill="#EDEDED" stroke="#E5E7EB"/>
+      <text x="517" y="214" text-anchor="middle" font-size="12" fill="#B4B2A9" font-family="sans-serif">—</text>
+
+      <text x="20" y="244" font-size="11.5" fill="#8B93A1" font-family="sans-serif">绿＝该行队伍获胜　红＝落败　看行列交叉即可，右上三角与左下三角互为镜像</text>
+    </svg>
+  </div>
+  <figcaption>图 3-3　对阵矩阵。检查有没有漏打的场次，看这张表最快</figcaption>
+</figure>
+
+<h4>小组赛程</h4>
+
+<p>按轮次列出每场的时间和场地，<b>轮空的队伍会单独标出来</b>。发给领队就是这个清单。</p>
+
+<h3 id="s3-7"><span class="num">3.7</span>淘汰赛与对阵图</h3>
+
+<h4>小组赛打完后自动推进</h4>
+
+<p>当某个小组的<strong>所有场次都录了比分</strong>，系统会提示可以推进到淘汰赛。点<b>「推进阶段」</b>，系统按积分榜的名次和设定的配对方式，自动生成淘汰赛对阵。</p>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 860 330" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>八强首尾配对淘汰赛</title>
+      <text x="20" y="24" font-size="13" font-weight="600" fill="#1A1A1A" font-family="sans-serif">8 个小组 → 首尾配对：A1-H1、B1-G1、C1-F1、D1-E1</text>
+
+      <rect x="20" y="46" width="150" height="34" rx="6" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="95" y="68" text-anchor="middle" font-size="12.5" fill="#0052D9" font-family="sans-serif">A 组第 1 名</text>
+      <rect x="20" y="86" width="150" height="34" rx="6" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="95" y="108" text-anchor="middle" font-size="12.5" fill="#4B5563" font-family="sans-serif">H 组第 1 名</text>
+
+      <rect x="20" y="136" width="150" height="34" rx="6" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="95" y="158" text-anchor="middle" font-size="12.5" fill="#0052D9" font-family="sans-serif">D 组第 1 名</text>
+      <rect x="20" y="176" width="150" height="34" rx="6" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="95" y="198" text-anchor="middle" font-size="12.5" fill="#4B5563" font-family="sans-serif">E 组第 1 名</text>
+
+      <rect x="20" y="226" width="150" height="34" rx="6" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="95" y="248" text-anchor="middle" font-size="12.5" fill="#0052D9" font-family="sans-serif">B 组第 1 名</text>
+      <rect x="20" y="266" width="150" height="34" rx="6" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="95" y="288" text-anchor="middle" font-size="12.5" fill="#4B5563" font-family="sans-serif">G 组第 1 名</text>
+
+      <path d="M174 63 L206 63 L206 111 L206 111 L238 111" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M174 103 L206 103 L206 111" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M174 153 L206 153 L206 111" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M174 193 L206 193 L206 111" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M174 243 L206 243 L206 111" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M174 283 L206 283 L206 111" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+
+      <rect x="242" y="92" width="152" height="38" rx="6" fill="#F0F7F4" stroke="#0F6E56"/>
+      <text x="318" y="116" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">1/4 决赛 ①</text>
+      <rect x="242" y="140" width="152" height="38" rx="6" fill="#F0F7F4" stroke="#0F6E56"/>
+      <text x="318" y="164" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">1/4 决赛 ②</text>
+      <rect x="242" y="210" width="152" height="38" rx="6" fill="#F0F7F4" stroke="#0F6E56"/>
+      <text x="318" y="234" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">1/4 决赛 ③</text>
+      <rect x="242" y="258" width="152" height="38" rx="6" fill="#F0F7F4" stroke="#0F6E56"/>
+      <text x="318" y="282" text-anchor="middle" font-size="12.5" fill="#0F6E56" font-family="sans-serif">1/4 决赛 ④</text>
+
+      <path d="M398 111 L440 111 L440 168 L470 168" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M398 159 L440 159 L440 168" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M398 229 L440 229 L440 168" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M398 277 L440 277 L440 168" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+
+      <rect x="474" y="148" width="152" height="38" rx="6" fill="#FDF6E3" stroke="#BA7517"/>
+      <text x="550" y="172" text-anchor="middle" font-size="12.5" fill="#BA7517" font-family="sans-serif">半决赛 ①</text>
+      <rect x="474" y="240" width="152" height="38" rx="6" fill="#FDF6E3" stroke="#BA7517"/>
+      <text x="550" y="264" text-anchor="middle" font-size="12.5" fill="#BA7517" font-family="sans-serif">半决赛 ②</text>
+
+      <path d="M630 167 L672 167 L672 205 L694 205" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <path d="M630 259 L672 259 L672 205" fill="none" stroke="#8B93A1" stroke-width="1.4"/>
+      <rect x="698" y="186" width="142" height="38" rx="6" fill="#0052D9"/>
+      <text x="769" y="210" text-anchor="middle" font-size="13" font-weight="600" fill="#fff" font-family="sans-serif">决　赛</text>
+
+      <text x="20" y="320" font-size="11.5" fill="#8B93A1" font-family="sans-serif">首尾配对的好处：同一半区不出现两支同组队伍，强队不会在第一轮就相撞。另有「交叉配对」「对位配对」可选。</text>
+    </svg>
+  </div>
+  <figcaption>图 3-4　八强首尾配对。半决赛两个负方再打一场争第三名（可选）</figcaption>
+</figure>
+
+<h4>看对阵图</h4>
+
+<p>三个地方都能看到图形化的对阵图：</p>
+
+<ul>
+  <li><b>赛程编排 → 工具栏「对阵图」</b>：管理员随时查看</li>
+  <li><b>赛程编排 → 大屏控制端</b>：投到大屏幕</li>
+  <li><b>公开查询页的「淘汰赛对阵」标签</b>：发给学校、家长看</li>
+</ul>
+
+<p>对阵图会自动<strong>标出胜者</strong>、连出晋级线、标出冠军，还有一条虚线旁支表示三四名决赛。</p>
+
+<h3 id="s3-8"><span class="num">3.8</span>最终名次</h3>
+
+<div class="path"><b>球类项目</b><span class="sep">›</span>名次表</div>
+
+<p>淘汰赛全部打完后，名次通常自动生成：冠军、亚军、第三名（三四名决赛胜方）、第四名。</p>
+
+<p>如果有<strong>没打三四名决赛</strong>、或者需要按规程特殊处理（比如两队并列第三），点<b>「手动设置名次」</b>直接指定。</p>
+
+<div class="tip">
+  <b>名次表和积分榜不是一回事。</b>积分榜是小组赛的过程榜（按积分排），名次表是赛事的最终结果（按淘汰赛结果排）。颁奖、算团体总分用的是名次表。
+</div>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p4">第四篇　田径项目</h2>
+
+<p>田径比球类复杂，因为<strong>一个项目可能有预赛、复赛、决赛好几轮</strong>，每轮还要分道次，成绩单位有秒有米有分。系统把这些都做了自动化，但操作的先后顺序必须对。</p>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 860 240" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>田径项目流程</title>
+      <rect x="20" y="40" width="150" height="72" rx="9" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="95" y="66" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0052D9" font-family="sans-serif">① 配项目</text>
+      <text x="95" y="86" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">模板库导入</text>
+      <text x="95" y="102" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">评分表、达标线</text>
+
+      <rect x="190" y="40" width="150" height="72" rx="9" fill="#EAF1FE" stroke="#0052D9"/>
+      <text x="265" y="66" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0052D9" font-family="sans-serif">② 排日程</text>
+      <text x="265" y="86" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">生成日程单元</text>
+      <text x="265" y="102" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">赛次排进单元</text>
+
+      <rect x="360" y="40" width="150" height="72" rx="9" fill="#F0F7F4" stroke="#0F6E56"/>
+      <text x="435" y="66" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0F6E56" font-family="sans-serif">③ 分组分道</text>
+      <text x="435" y="86" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">按时段切组</text>
+      <text x="435" y="102" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">分配道次</text>
+
+      <rect x="530" y="40" width="150" height="72" rx="9" fill="#F0F7F4" stroke="#0F6E56"/>
+      <text x="605" y="66" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0F6E56" font-family="sans-serif">④ 现场</text>
+      <text x="605" y="86" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">检录、临变</text>
+      <text x="605" y="102" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">号码簿</text>
+
+      <rect x="700" y="40" width="140" height="72" rx="9" fill="#FDF6E3" stroke="#BA7517"/>
+      <text x="770" y="66" text-anchor="middle" font-size="12.5" font-weight="600" fill="#BA7517" font-family="sans-serif">⑤ 成绩</text>
+      <text x="770" y="86" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">录入、排名</text>
+      <text x="770" y="102" text-anchor="middle" font-size="11.5" fill="#1A1A1A" font-family="sans-serif">晋级录取</text>
+
+      <path d="M174 76 L186 76" fill="none" stroke="#8B93A1" stroke-width="1.6"/>
+      <path d="M344 76 L356 76" fill="none" stroke="#8B93A1" stroke-width="1.6"/>
+      <path d="M514 76 L526 76" fill="none" stroke="#8B93A1" stroke-width="1.6"/>
+      <path d="M684 76 L696 76" fill="none" stroke="#8B93A1" stroke-width="1.6"/>
+      <path d="M770 116 L770 146 L95 146 L95 164" fill="none" stroke="#8B93A1" stroke-width="1.6"/>
+
+      <rect x="20" y="168" width="820" height="54" rx="9" fill="#F7F8FA" stroke="#E5E7EB"/>
+      <text x="40" y="190" font-size="12.5" font-weight="600" fill="#1A1A1A" font-family="sans-serif">⑥ 出结果</text>
+      <text x="40" y="210" font-size="12" fill="#4B5563" font-family="sans-serif">秩序册（可导 Word）· 奖状 · 团体总分 · 达级认定 · 破纪录 · 大屏与公开页</text>
+    </svg>
+  </div>
+  <figcaption>图 4-1　田径六步走。②③ 谁先都行，但如果先分组后改日程，组要重分</figcaption>
+</figure>
+
+<h3 id="s4-1"><span class="num">4.1</span>田径中心</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>田径中心</div>
+
+<p>这个页面是田径的"配置中心"，四个标签页。建议<strong>每届运动会开始前先在这里把配置理一遍</strong>，后面所有环节都依赖它。</p>
+
+<h4>项目模板库</h4>
+
+<p>存的是<strong>标准项目定义</strong>：项目名称、类型（径赛／田赛／接力／全能）、计量单位、成绩格式、是否越大越好、道次数、试跳次数等。</p>
+
+<ol class="steps">
+  <li>点<b>「新建模板」</b>，把常用项目一个个建好：100 米、200 米、400 米、800 米、1500 米、4×100 米接力、跳高、跳远、铅球、实心球……</li>
+  <li>模板建一次，<b>以后每届都能复用</b>。要改只改需要改的那几项。</li>
+  <li>建赛事项目时，用「从模板库批量添加」把这些模板一次导入，参数全部继承，不用重复填。</li>
+</ol>
+
+<div class="tip">
+  <b>建议按学段分开建模板。</b>小学的男子 100 米和初中的男子 100 米，达标线、道次数可能都不一样。命名上加前缀，比如"小学-100米""初中-100米"，导入时不容易选错。
+</div>
+
+<h3 id="s4-2"><span class="num">4.2</span>评分表与达标标准</h3>
+
+<h4>评分表（把成绩换算成分数）</h4>
+
+<p>有些项目不按名次给分，而是<strong>按成绩换算成分数</strong>（比如《国家学生体质健康标准》的评分表，或者全能项目的计分）。系统支持两种换算方式：</p>
+
+<table>
+  <thead><tr><th style="width:150px">方式</th><th>怎么用</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>查表法</strong></td>
+      <td>一行一条对应关系：成绩 12.5 秒 → 90 分。适合直接照抄现成的评分标准表。录入时系统自动查最近的一档</td>
+    </tr>
+    <tr>
+      <td><strong>公式法</strong></td>
+      <td>用国际田联的全能评分公式 <code>P = A × (B − T)^C</code>（径赛）或 <code>P = A × (M − B)^C</code>（田赛）。填 A、B、C 三个系数即可，系统自动算分</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>建好评分表后，有两个地方会用到：① 项目绑定了评分表，录成绩时自动出分；② 团体总分按"得分"计算时用它。</p>
+
+<p>页面上有<b>「试算」</b>按钮 —— 填一个成绩，立刻看到算出多少分。调系数的时候用它验证，不用真录一次成绩去试。</p>
+
+<h4>达标标准（达级认定）</h4>
+
+<p>用于<strong>判定运动员达到什么等级</strong>（如国家二级、三级运动员，或校内定的"优秀／良好／合格"）。</p>
+
+<ul>
+  <li>先建<b>等级标准</b>：几个等级、每级叫什么、加多少分</li>
+  <li>再建<b>各等级的达标线</b>：按项目 + 组别 + 性别，每一档填一个阈值</li>
+  <li>径赛是<b>越小越好</b>（成绩 ≤ 阈值即达标）；田赛是<b>越大越好</b>（成绩 ≥ 阈值即达标）。系统按项目类型自动判断方向</li>
+  <li>一个运动员可能同时达到多个等级（既够二级又够三级），系统<b>取最高等级</b></li>
+</ul>
+
+<h3 id="s4-3"><span class="num">4.3</span>全能项目</h3>
+
+<p>全能（如三项全能、五项全能）是<strong>把几个单项的成绩换算成分数，加总排名</strong>。设置方法：</p>
+
+<ol class="steps">
+  <li>先在「全能项目」标签里<b>新建一个全能项目</b>，比如"初中男子三项全能"。</li>
+  <li>给它挂上<b>若干子项</b>：100 米、跳远、铅球，并指定每个子项的先后顺序。</li>
+  <li>每个子项都要绑定<b>评分规则</b>（查表或公式），否则算不出分。</li>
+  <li>比赛时各子项按普通项目正常录入成绩，系统自动汇总到全能总分。</li>
+</ol>
+
+<p>成绩录入页有全能汇总入口，能看到<strong>总分、已完成几项、还缺几项</strong>。缺项的全能运动员不参与排名。</p>
+
+<h3 id="s4-4"><span class="num">4.4</span>日程与单元</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>日程与秩序册<span class="sep">›</span>日程编排</div>
+
+<p>田径不用甘特图，用的是<strong>「日程单元」</strong>模型：</p>
+
+<div class="note">
+  <b>什么是日程单元？</b><br>
+  一个单元 = <b>某一天 + 上午 / 下午</b>。比如"9 月 20 日上午""9 月 20 日下午"各是一个单元。<br>
+  每个单元里可以放若干赛次，赛次占用时间，同一场地不能重叠。
+</div>
+
+<ol class="steps">
+  <li>点<b>「按赛期生成单元」</b>，系统根据赛事的起止日期，自动为每天生成上午、下午两个单元。</li>
+  <li>特殊安排可以<b>「添加单元」</b>手工加（比如晚上加一个单元做开幕式）。</li>
+  <li>左侧列出<b>所有待排赛次</b>（预赛、决赛分开列），右侧是按单元分组的时间表。</li>
+  <li>把赛次<b>拖进</b>右侧对应单元，或选中赛次点「安排」。</li>
+  <li>点<b>「自动排布」</b>可以让系统一口气排完：按 项目顺序 → 轮次 → 组号 依次填充，径赛先预赛后决赛，每个单元内按场地轮转。</li>
+  <li>排完点<b>「保存编排」</b>。</li>
+</ol>
+
+<h4>几个实用操作</h4>
+
+<table>
+  <thead><tr><th style="width:160px">操作</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><b>添加非比赛项</b></td><td>插入"开幕式""颁奖""午休"等不比赛的时段，占住时间，自动排布会绕开它</td></tr>
+    <tr><td><b>锁定</b></td><td>某个赛次的时间定死了（比如有电视转播），锁定后自动排布不再动它</td></tr>
+    <tr><td><b>整体改期</b></td><td>下雨顺延，输入"顺延 1 天"，所有日程整体后移，并留下改期记录</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s4-5"><span class="num">4.5</span>冲突检测</h3>
+
+<p>排完日程点<b>「检测冲突」</b>，系统检查三类问题：</p>
+
+<table>
+  <thead><tr><th style="width:130px">冲突类型</th><th>含义</th><th>举例</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>场地冲突</strong></td>
+      <td>同一场地同一时刻排了两场</td>
+      <td>1 号场 9:00 同时有"100 米预赛"和"跳远决赛"</td>
+    </tr>
+    <tr>
+      <td><strong>运动员冲突</strong></td>
+      <td>同一运动员在重叠时段被安排了两场</td>
+      <td>张三 9:00 既跑 100 米又扔铅球</td>
+    </tr>
+    <tr>
+      <td><strong>休息不足</strong></td>
+      <td>同一运动员两场之间间隔小于规定的最短休息时间</td>
+      <td>李四 9:00 跑完 100 米预赛，9:10 又跑 200 米预赛</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>冲突会列在「冲突列表」里，逐条点进去调整。处理完可以标为<b>「已解决」</b>。</p>
+
+<div class="warn">
+  <b>自动排布不会自动避开所有冲突。</b>它只保证"场地不重叠"，运动员兼项冲突和休息不足要靠检测发现后人工调。所以<b>自动排完一定要点一次冲突检测</b>。
+</div>
+
+<h3 id="s4-6"><span class="num">4.6</span>分组与道次</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>成绩录入<span class="sep">›</span>分组编排</div>
+
+<h4>先定赛次：这个项目要打几轮？</h4>
+
+<p>系统按<strong>项目距离 + 报名人数</strong>自动判定，规则来自田径竞赛规程的通行做法：</p>
+
+<table>
+  <thead><tr><th style="width:180px">项目</th><th style="width:110px">人数</th><th>系统判定的赛次</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="3">100 米、200 米、直道栏</td><td>8 人以内</td><td>直接决赛（1 组）</td></tr>
+    <tr><td>9–16 人</td><td>预赛 + 决赛</td></tr>
+    <tr><td>17 人以上</td><td>预赛 + 复赛 + 决赛</td></tr>
+    <tr><td rowspan="2">400 米及以上、跨栏</td><td>不分人数</td><td><strong>只跑一次（单轮）</strong>，按成绩直接排名</td></tr>
+    <tr><td colspan="2" style="color:var(--ink-3)">这是北京田径范本的做法：中长跑体力消耗大，不设多轮</td></tr>
+    <tr><td>田赛（跳、投）</td><td>不分人数</td><td>一次决赛，按试跳／试投最好成绩排名</td></tr>
+  </tbody>
+</table>
+
+<h4>再分组：切几组、每人站几道</h4>
+
+<p>点<b>「开始编排」</b>，系统按道次数切组。关键细节：<strong>人数除不尽时，最后一组从第 2 道开始排，第 1 道空着</strong>。</p>
+
+<figure>
+  <div class="fig-box">
+    <svg viewBox="0 0 860 250" xmlns="http://www.w3.org/2000/svg" role="img">
+      <title>径赛道次编排</title>
+      <text x="20" y="24" font-size="13" font-weight="600" fill="#1A1A1A" font-family="sans-serif">8 道标准跑道：满员组 vs 不满员组</text>
+
+      <text x="20" y="62" font-size="12.5" fill="#4B5563" font-family="sans-serif">满员（8 人）</text>
+      <g font-family="sans-serif" font-size="11.5">
+        <rect x="130" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="161" y="68" text-anchor="middle" fill="#0052D9">1 道</text>
+        <rect x="196" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="227" y="68" text-anchor="middle" fill="#0052D9">2 道</text>
+        <rect x="262" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="293" y="68" text-anchor="middle" fill="#0052D9">3 道</text>
+        <rect x="328" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="359" y="68" text-anchor="middle" fill="#0052D9">4 道</text>
+        <rect x="394" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="425" y="68" text-anchor="middle" fill="#0052D9">5 道</text>
+        <rect x="460" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="491" y="68" text-anchor="middle" fill="#0052D9">6 道</text>
+        <rect x="526" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="557" y="68" text-anchor="middle" fill="#0052D9">7 道</text>
+        <rect x="592" y="46" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="623" y="68" text-anchor="middle" fill="#0052D9">8 道</text>
+      </g>
+
+      <text x="20" y="132" font-size="12.5" fill="#4B5563" font-family="sans-serif">不满员（2 人）</text>
+      <g font-family="sans-serif" font-size="11.5">
+        <rect x="130" y="116" width="62" height="34" rx="4" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/><text x="161" y="138" text-anchor="middle" fill="#B4B2A9">空</text>
+        <rect x="196" y="116" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="227" y="138" text-anchor="middle" fill="#0052D9">2 道</text>
+        <rect x="262" y="116" width="62" height="34" rx="4" fill="#EAF1FE" stroke="#0052D9"/><text x="293" y="138" text-anchor="middle" fill="#0052D9">3 道</text>
+        <rect x="328" y="116" width="62" height="34" rx="4" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/><text x="359" y="138" text-anchor="middle" fill="#B4B2A9">空</text>
+        <rect x="394" y="116" width="62" height="34" rx="4" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/><text x="425" y="138" text-anchor="middle" fill="#B4B2A9">空</text>
+        <rect x="460" y="116" width="62" height="34" rx="4" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/><text x="491" y="138" text-anchor="middle" fill="#B4B2A9">空</text>
+        <rect x="526" y="116" width="62" height="34" rx="4" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/><text x="557" y="138" text-anchor="middle" fill="#B4B2A9">空</text>
+        <rect x="592" y="116" width="62" height="34" rx="4" fill="#F1F3F5" stroke="#DDE3EC" stroke-dasharray="4 3"/><text x="623" y="138" text-anchor="middle" fill="#B4B2A9">空</text>
+      </g>
+
+      <text x="20" y="200" font-size="12" fill="#A32D2D" font-family="sans-serif">为什么第 1 道留空？第 1 道弯道最急、吃亏最大，人少时按惯例从第 2 道开始排，把最差的道次空出来。</text>
+      <text x="20" y="224" font-size="12" fill="#8B93A1" font-family="sans-serif">决赛道次另有讲究：按预赛成绩由中间向两边排（8 道 → 4、5、3、6、2、7、1、8），成绩最好的站 4 道。</text>
+    </svg>
+  </div>
+  <figcaption>图 4-2　道次编排。满员组 1–8 道全用，不满员组从第 2 道起排</figcaption>
+</figure>
+
+<p>编排时还可以选<b>分组依据</b>：</p>
+
+<ul>
+  <li><b>按号码顺序</b>：简单，适合基层比赛</li>
+  <li><b>按种子成绩</b>：有报名成绩时用，强的分到不同组，避免预赛就扎堆</li>
+  <li><b>同校分开</b>：同一所学校的运动员尽量分在不同组</li>
+</ul>
+
+<p>排完可以手动<b>调整道次</b>或<b>换组</b>，系统会记录调整痕迹。</p>
+
+<h3 id="s4-7"><span class="num">4.7</span>赛中控台</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>赛中控台</div>
+
+<p>比赛当天用的页面，五个标签：</p>
+
+<h4>号码簿</h4>
+
+<ul>
+  <li>点<b>「生成号码」</b>，系统按学校分配号段自动编号（每校一个号段，200 个号一档），避免撞号</li>
+  <li><b>「缺号检查」</b>：列出还没分到号码的运动员，防止漏人上不了场</li>
+  <li>需要个别调整点<b>「改号」</b>；整个赛事重来点<b>「清空」</b></li>
+</ul>
+
+<h4>临时变更</h4>
+
+<p>现场最常用的功能。四种变更加一种撤销：</p>
+
+<table>
+  <thead><tr><th style="width:120px">类型</th><th>场景</th></tr></thead>
+  <tbody>
+    <tr><td><b>临时报名</b></td><td>名单外的人要参赛（补报），现场加进来</td></tr>
+    <tr><td><b>撤赛</b></td><td>运动员临时弃权，从赛次里撤掉</td></tr>
+    <tr><td><b>换人</b></td><td>接力队换棒次，或某人来不了换同校另一人</td></tr>
+    <tr><td><b>改项</b></td><td>报错了项目，现场改到正确项目</td></tr>
+    <tr><td><b>改名</b></td><td>名字打错了，改正</td></tr>
+  </tbody>
+</table>
+
+<p>所有变更都留记录，发现改错了点<b>「撤销」</b>即可回退。变更有<b>候选人列表</b>，从合法范围内选，不会出现"换了人但那人没报名"的情况。</p>
+
+<h4>检录表 / 成绩单</h4>
+
+<p>按赛次打印检录表（道次、号码、姓名、单位）和空白成绩单。打印版式可以在<b>「表单配置」</b>里调（纸张、字号、要不要照片）。</p>
+
+<h4>成绩公布</h4>
+
+<p>录入并确认的成绩，在这里<b>发布</b>到公开页和大屏，也可以<b>撤回</b>。发布前先核对，公开出去就有人截图了。</p>
+
+<h4>裁判员账号</h4>
+
+<p>给现场裁判开登录账号，一人一个。裁判登录后只能看到<b>分给自己的场次</b>，只能录那些场的成绩，权限是收窄的。</p>
+
+<h3 id="s4-8"><span class="num">4.8</span>成绩录入</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>成绩录入</div>
+
+<h4>径赛：按道次录</h4>
+
+<p>界面是一张道次表：每一行一个道次，填成绩（秒）。系统自动排序、算名次。</p>
+
+<p>成绩格式很宽松，下面这些写法都能识别：</p>
+
+<table>
+  <thead><tr><th style="width:180px">你输入的</th><th>系统理解</th></tr></thead>
+  <tbody>
+    <tr><td><code>12.34</code></td><td>12 秒 34</td></tr>
+    <tr><td><code>1:23.45</code></td><td>1 分 23 秒 45</td></tr>
+    <tr><td><code>11"23</code></td><td>11 秒 23（体育老师习惯写法）</td></tr>
+    <tr><td><code>1'23"45</code></td><td>1 分 23 秒 45</td></tr>
+  </tbody>
+</table>
+
+<h4>田赛：按出场顺序 + 试跳明细</h4>
+
+<p>每个运动员一行，可以录多次试跳／试投（默认 3 次基本 + 3 次加试）。系统取<b>最好成绩</b>参与排名。犯规的试次标 <code>X</code>，弃权的标 <code>DNS</code>。</p>
+
+<h4>特殊状态</h4>
+
+<table>
+  <thead><tr><th style="width:110px">代号</th><th>含义</th><th>处理</th></tr></thead>
+  <tbody>
+    <tr><td><b>DNS</b></td><td>弃权 / 未出场</td><td>不参与排名</td></tr>
+    <tr><td><b>DNF</b></td><td>中途退赛</td><td>不参与排名</td></tr>
+    <tr><td><b>DQ</b></td><td>犯规取消资格</td><td>不参与排名</td></tr>
+  </tbody>
+</table>
+
+<h4>录完要"确认"</h4>
+
+<ol class="steps">
+  <li>录完点<b>「保存成绩」</b>—— 此时只是暂存，还能改。</li>
+  <li>核对无误点<b>「确认」</b>—— 该赛次锁定，成绩进入统计和晋级计算。</li>
+  <li>确认后要改，得先<b>「撤销」</b>，改完再确认一遍。</li>
+</ol>
+
+<div class="warn">
+  <b>只有"已确认"的成绩才算数。</b>积分、达级、破纪录、晋级，全部只认已确认的赛次。录了没确认，等于没录。
+</div>
+
+<h3 id="s4-9"><span class="num">4.9</span>晋级录取</h3>
+
+<p>预赛成绩确认后，点<b>「晋级录取」</b>生成下一轮名单。系统支持两种规则：</p>
+
+<table>
+  <thead><tr><th style="width:150px">规则</th><th>怎么取人</th><th>举例</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>按名次取 + 递补</strong></td>
+      <td>每组先按名次取 N 人，名额没满的再按成绩从剩余人里递补</td>
+      <td>16 人 2 组，每组取 3 人 = 6 人，再按成绩递补 2 人 = 8 人进决赛</td>
+    </tr>
+    <tr>
+      <td><strong>按成绩取前 N</strong></td>
+      <td>不分小组，所有人按成绩排队，取前 N 人</td>
+      <td>42 人 6 组，按成绩取 24 人进复赛</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>生成后每个晋级者会标注<b>晋级原因</b>（按名次 / 成绩递补），方便对外解释。点<b>「生成下一轮」</b>自动建下一轮的赛次并分好道次。</p>
+
+<h3 id="s4-10"><span class="num">4.10</span>秩序册</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>日程与秩序册<span class="sep">›</span>秩序册</div>
+
+<p>秩序册是比赛前发到各校的正式册子，内容包括：赛事信息、组委会名单、竞赛规程、参赛名单、日程表、分组分道表。</p>
+
+<ol class="steps">
+  <li>确认日程已保存、分组分道已完成。</li>
+  <li>点<b>「生成秩序册」</b>，系统按日程单元自动编排册子内容。</li>
+  <li>点<b>「预览 / 打印」</b>看效果，或点<b>「导出 Word」</b>拿到可编辑的文档。</li>
+  <li>导出后可以再加封面、领导讲话、往届成绩等内容，用 Word 排版打印。</li>
+</ol>
+
+<div class="tip">
+  <b>导出 Word 是关键。</b>直接打印 PDF 改不了，导出 Word 后可以套用局里的公文模板、加红头、调页眉页脚，最终成品更正式。
+</div>
+
+<h3 id="s4-11"><span class="num">4.11</span>团体总分</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>赛后统计<span class="sep">›</span>团体总分</div>
+
+<p>团体总分算的是<strong>学校（单位）的总分</strong>，不是个人。系统支持三种口径：</p>
+
+<table>
+  <thead><tr><th style="width:130px">口径</th><th>含义</th><th>适用</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>分组别</strong></td>
+      <td>每个组别单独一张榜（小学男子团体、小学女子团体……）</td>
+      <td>分开设奖，最常见</td>
+    </tr>
+    <tr>
+      <td><strong>合并</strong></td>
+      <td>把几个组别的分加在一起算（比如男女合并算"小学组团体"）</td>
+      <td>按学段设综合奖</td>
+    </tr>
+    <tr>
+      <td><strong>虚拟组</strong></td>
+      <td>把几所学校并成一个队参与排名（如"市区联队""乡镇联队"）</td>
+      <td>校际联赛、片区对抗</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>分数怎么来</h4>
+
+<p>两种计分来源，建方案时选：</p>
+
+<ul>
+  <li><strong>按名次查表</strong>：第 1 名 9 分、第 2 名 7 分……名次分表可以自己改</li>
+  <li><strong>直接用评分规则的得分</strong>：项目绑定了评分表时，用换算出来的分数</li>
+</ul>
+
+<p>只有<strong>已确认</strong>的赛次、且名次在录取范围内的成绩才会计分。</p>
+
+<div class="tip">
+  <b>同分怎么办？</b>系统按"先比第一名个数，再比第二名、第三名"依次排 —— 这是田径团体总分的通行做法，避免了"靠一堆第二名压过别人一个第一名"。
+</div>
+
+<p>算完可以<b>「导出 CSV」</b>做公示，也可以在表格里<b>人工调整</b>个别分数（会记录调整痕迹）。</p>
+
+<h3 id="s4-12"><span class="num">4.12</span>达级与破纪录</h3>
+
+<h4>达级认定</h4>
+
+<p>点<b>「批量认定达级」</b>，系统扫描所有已确认成绩，按达标线自动判定每人达到的最高等级，并生成认定记录。认定后可以按等级<b>加分</b>计入团体总分。</p>
+
+<p>发现认定错了可以<b>「撤销」</b>单条记录重来。</p>
+
+<h4>破纪录</h4>
+
+<ol class="steps">
+  <li>先在<b>「纪录」</b>里登记历史纪录：项目、组别、性别、纪录成绩、创造者、创造时间。</li>
+  <li>比赛期间点<b>「自动检测破纪录」</b>，系统拿已确认成绩去比对，超过纪录的自动标记。</li>
+  <li>赛会纪录和最高纪录<b>分开判定</b>，一个成绩可能同时破两项。</li>
+  <li>破纪录可以按规则<b>加分</b>，也可以撤销量错的记录。</li>
+</ol>
+
+<h3 id="s4-13"><span class="num">4.13</span>奖状</h3>
+
+<div class="path"><b>田径项目</b><span class="sep">›</span>日程与秩序册<span class="sep">›</span>奖状</div>
+
+<p>点<b>「新建模板」</b>设计奖状版式（标题、获奖文字、落款、日期、印章位置），然后在<b>「生成」</b>里选名次批量出奖状。</p>
+
+<p>生成后系统记录<b>打印状态</b>，能看出哪些已经打过、哪些还没打，避免重复打印或漏打。</p>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p5">第五篇　对外发布</h2>
+
+<h3 id="s5-1"><span class="num">5.1</span>赛事大屏</h3>
+
+<div class="path"><b>赛事发布</b><span class="sep">›</span>大屏控制端</div>
+
+<p>大屏用于现场投影，内容可以选：团体总分、最新成绩、破纪录滚动、淘汰赛对阵图。</p>
+
+<ol class="steps">
+  <li>在「大屏控制端」里配置显示哪些模块、显示哪个组别。</li>
+  <li>需要时说一句话通知全场（如"请初中男子 100 米运动员到检录处"），用<b>「插播」</b>功能。</li>
+  <li>大屏页面打开后<b>自动刷新</b>，不用手动点。</li>
+  <li>把大屏链接复制到投影电脑的浏览器，按 F11 全屏即可。</li>
+</ol>
+
+<div class="tip">
+  <b>大屏不需要登录。</b>拿到链接就能看，方便临时用别的电脑或借来的投影设备。
+</div>
+
+<h3 id="s5-2"><span class="num">5.2</span>公开查询页</h3>
+
+<p>每个赛事都有一个独立的公开页链接，发给学校、家长，<strong>不用登录</strong>就能查：</p>
+
+<ul>
+  <li>赛事基本信息</li>
+  <li>各项目名次与成绩</li>
+  <li>团体总分</li>
+  <li>淘汰赛对阵图</li>
+</ul>
+
+<p>页面<b>每 60 秒自动刷新</b>，成绩一确认，外面就能看到。</p>
+
+<p>链接可以在「赛后统计 → 公开页」里查看，如果泄露了或者想换一个，点<b>「重置 UUID」</b>旧链接立即失效。</p>
+
+<div class="warn">
+  <b>公开页只显示已发布的内容。</b>成绩录入后要在「赛中控台 → 成绩公布」里点发布，公开页才看得到。这是为了防止录错还没核对就流出去。
+</div>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p6">第六篇　四种场景实操</h2>
+
+<p>前面讲的是"零件怎么用"，这一篇讲"整台机器怎么装"。四种最常见的办赛场景，按这个顺序走就行。</p>
+
+<h3 id="s6-1"><span class="num">6.1</span>综合运动会（田径 + 球类）</h3>
+
+<p><strong>典型：</strong>一年一度的中小学生秋季运动会，设小学、初中、高中男女共 6 个组别，田径十几个项目，同时有篮球、足球联赛。</p>
+
+<h4>完整操作清单</h4>
+
+<table>
+  <thead><tr><th style="width:60px">步骤</th><th style="width:210px">做什么</th><th style="width:190px">菜单</th><th>要点</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>建赛事</td><td>赛事组织 › 赛事管理</td><td>学段选"不限"，起止日期填准（后面生成日程单元要用）</td></tr>
+    <tr><td>2</td><td>建 6 个组别</td><td>项目与场地 › 组别管理</td><td>男小／女小／男初／女初／男高／女高</td></tr>
+    <tr><td>3</td><td>导入田径项目</td><td>项目与场地 › 竞赛项目</td><td>用「从模板库批量添加」，一次导完</td></tr>
+    <tr><td>4</td><td>建球类项目</td><td>项目与场地 › 竞赛项目</td><td>篮球按"不允许平局、胜 2 分"，足球按"允许平局、胜 3 平 1"</td></tr>
+    <tr><td>5</td><td>配场地</td><td>项目与场地 › 场地管理</td><td>田径场 1 号，篮球场 2–4 号，足球场 5 号</td></tr>
+    <tr><td>6</td><td>建学校和账号</td><td>赛事组织 › 学校与账号</td><td>每校一个账号，密码转告</td></tr>
+    <tr><td>7</td><td>学校报名</td><td>（学校端）报名管理</td><td>球类走"球队报名"，田径走"个人报名"</td></tr>
+    <tr><td>8</td><td>审核报名</td><td>赛事组织 › 报名管理</td><td>批量通过 + 挑异常，<b>务必审完</b></td></tr>
+    <tr><td>9</td><td>球类分组</td><td>球类项目 › 分组编排</td><td>一个项目一个项目做，先预览再执行</td></tr>
+    <tr><td>10</td><td>出球类赛程</td><td>球类项目 › 赛程编排</td><td>生成时间槽 → 自动装箱 → 手动微调</td></tr>
+    <tr><td>11</td><td>田径排日程</td><td>田径项目 › 日程与秩序册</td><td>生成单元 → 安排赛次 → 检测冲突</td></tr>
+    <tr><td>12</td><td>田径分组分道</td><td>田径项目 › 成绩录入 › 分组编排</td><td>每个项目做一次</td></tr>
+    <tr><td>13</td><td>出秩序册</td><td>田径项目 › 日程与秩序册 › 秩序册</td><td>导出 Word，套公文模板</td></tr>
+    <tr><td>14</td><td>比赛期间录分</td><td>球类：赛程编排／我的赛程<br>田径：成绩录入</td><td>球类录完自动进积分榜；田径录完要<b>确认</b></td></tr>
+    <tr><td>15</td><td>推进淘汰赛</td><td>球类项目 › 分组编排</td><td>小组赛全部录完后点「推进阶段」</td></tr>
+    <tr><td>16</td><td>田径晋级</td><td>田径项目 › 成绩录入 › 晋级录取</td><td>预赛确认后生成下一轮</td></tr>
+    <tr><td>17</td><td>出结果</td><td>赛后统计／名次表</td><td>团体总分、达级、破纪录、奖状</td></tr>
+    <tr><td>18</td><td>对外发布</td><td>赛事发布 › 大屏控制端</td><td>配置大屏 + 发公开页链接</td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  <b>综合运动会最容易踩的坑：场地抢时间。</b><br>
+  田径和球类共用同一片场地（比如都在操场上）。<b>先排田径还是先排球类，要提前定</b>：如果田径集中在前两天，球类就排在后面几天；如果穿插进行，场地必须分开（田径场内场 + 外场篮球）。排错了要全部重排。
+</div>
+
+<h3 id="s6-2"><span class="num">6.2</span>单项篮球联赛</h3>
+
+<p><strong>典型：</strong>2027 年高中上半年篮球联赛，8 所学校参赛，主客场循环，打一个学期。</p>
+
+<h4>和综合运动会不同的地方</h4>
+
+<table>
+  <thead><tr><th style="width:150px">差异点</th><th>怎么设</th></tr></thead>
+  <tbody>
+    <tr><td>组别只有 1 个</td><td>只建"男高"（或"男高""女高"两个），不用建小学初中</td></tr>
+    <tr><td>项目只有 1 个</td><td>只建"篮球"一个项目</td></tr>
+    <tr><td><strong>主客场制</strong></td><td>项目参数里打开<b>主客场</b>。开启后每场会区分主队客队，赛程按"主客轮换"排</td></tr>
+    <tr><td>跨月进行</td><td>起止日期跨度大，日程单元会生成很多个，只排需要的那些</td></tr>
+    <tr><td>没有田径</td><td>田径相关的菜单整个不用管</td></tr>
+  </tbody>
+</table>
+
+<h4>主客场怎么排</h4>
+
+<p>8 支队单循环 = 7 轮 28 场。开启主客场后，系统按贝格尔轮转生成对阵，并自动分配主客 —— 每轮有一半队伍在主场。如果需要"主客各打一场"（双循环），把<b>每组轮数</b>设成自动轮数的 2 倍即可，场次翻倍。</p>
+
+<div class="tip">
+  <b>联赛最重要的不是编排，是持续录分。</b>跨月的联赛，每轮打完当天就要录。攒到期末一起录，容易漏场次，而且积分榜长时间不更新，学校会有意见。
+</div>
+
+<h3 id="s6-3"><span class="num">6.3</span>单项田径运动会</h3>
+
+<p><strong>典型：</strong>某初中校内田径运动会，一天半，只有田径项目。</p>
+
+<h4>关键差异</h4>
+
+<ul>
+  <li><strong>时间极紧</strong>：一天半要跑完所有项目，日程单元只有 3 个（第一天上午、下午，第二天上午）。自动排布时要把"每单元容量"算准</li>
+  <li><strong>项目多、赛次多</strong>：100 米可能预赛 + 决赛两轮，800 米只有一轮。系统的赛次判定会自动区分</li>
+  <li><strong>没有球类</strong>：赛程甘特图不用，全在"日程与秩序册"里做</li>
+  <li><strong>秩序册要得快</strong>：比赛前一天必须印出来，导出 Word 后当晚排版打印</li>
+</ul>
+
+<h4>时间怎么估</h4>
+
+<p>一个赛次占用多少分钟，按项目算：</p>
+
+<table>
+  <thead><tr><th style="width:180px">项目类型</th><th style="width:140px">单组用时</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>100 米、200 米</td><td>6–8 分钟</td><td>一组跑完 + 记录 + 下一组准备</td></tr>
+    <tr><td>400 米、800 米</td><td>8–12 分钟</td><td>跑完要喘，间隔长一点</td></tr>
+    <tr><td>1500 米、3000 米</td><td>15–20 分钟</td><td>跑完有人扶，留足时间</td></tr>
+    <tr><td>跳远、铅球</td><td>每组 20–30 分钟</td><td>每人 3–6 次试跳／试投，人多就慢</td></tr>
+    <tr><td>跳高</td><td>30–40 分钟</td><td>升杆、试跳轮次多，最耗时间</td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  <b>田赛比径赛更容易拖时间。</b>铅球、跳高这类项目，10 个人 3 次试投就要 30 分钟以上。排日程时田赛要留足缓冲，最好和径赛<b>并行</b>排（不同场地同时进行），否则一天排不完。
+</div>
+
+<h3 id="s6-4"><span class="num">6.4</span>乒乓球／羽毛球单淘汰赛</h3>
+
+<p><strong>典型：</strong>教职工乒乓球赛，64 人单淘汰，一天打完。</p>
+
+<h4>关键差异</h4>
+
+<ul>
+  <li><strong>人多场次多</strong>：64 人单淘汰 = 63 场。分 8 个场地，每个场地 8 场</li>
+  <li><strong>没有小组赛</strong>：直接淘汰。分组那一步可以跳过，或者只分 1 组</li>
+  <li><strong>绝对不能平局</strong>：项目参数里"允许平局"必须选<b>否</b>，否则录入时填相同比分不会被拦</li>
+  <li><strong>单场时间短</strong>：乒乓球三局两胜最快 15 分钟，槽间隔给 30 分钟足够</li>
+  <li><strong>轮次多</strong>：64 人 = 6 轮（1/32 → 1/16 → 1/8 → 1/4 → 半决赛 → 决赛），系统按 2 的幂自动算轮空位</li>
+</ul>
+
+<h4>人数不是 2 的幂怎么办</h4>
+
+<p>63 人参赛，不是 2 的幂（64 才是）。系统会自动算出<strong>轮空位 = 64 − 63 = 1 个</strong>，1 号种子首轮轮空，直接进下一轮。这是标准做法，不用手工处理。</p>
+
+<div class="tip">
+  <b>乒羽比赛最快的是"边打边录"。</b>让每个场地的裁判用自己的账号登录「我的赛程」，打完立刻录。全部汇总到管理员那里再录，一天 63 场根本录不完。
+</div>
+
+<!-- ============================================================ -->
+<h2 class="part" id="p7">附录</h2>
+
+<h3 id="s7-1"><span class="num">A</span>参数速查表</h3>
+
+<table>
+  <thead><tr><th style="width:150px">参数</th><th style="width:100px">默认值</th><th style="width:130px">取值范围</th><th>影响什么</th></tr></thead>
+  <tbody>
+    <tr><td>道次数</td><td>8</td><td>4 – 10</td><td>径赛每组最多几人；不满时从第 2 道起排</td></tr>
+    <tr><td>加复赛人数门槛</td><td>16</td><td>8 – 64</td><td>报名人数超过这个数，100/200 米就加复赛</td></tr>
+    <tr><td>单场时长</td><td>24 分钟</td><td>10 – 120</td><td>球类排期估算用</td></tr>
+    <tr><td>时间槽间隔</td><td>45 分钟</td><td>20 – 180</td><td>同场地相邻场次的起始间隔，必须 ≥ 单场时长</td></tr>
+    <tr><td>分几组</td><td>0（自动）</td><td>0 – 8</td><td>球类小组赛分几个组</td></tr>
+    <tr><td>每组几轮</td><td>0（自动）</td><td>0 – 20</td><td>0 表示按队数走单循环；填 2 倍即双循环</td></tr>
+    <tr><td>进淘汰赛人数</td><td>4</td><td>2 – 16</td><td>每组取前几名晋级</td></tr>
+    <tr><td>胜场积分</td><td>3</td><td>1 – 3</td><td>赢一场得几分</td></tr>
+    <tr><td>平局积分</td><td>1</td><td>0 – 3</td><td>平一场得几分（负数固定 0 分）</td></tr>
+    <tr><td>试跳／试投次数</td><td>3 + 3</td><td>1 – 6</td><td>田赛基本次数 + 加试次数</td></tr>
+    <tr><td>最短休息时间</td><td>按赛事配置</td><td>0 – 120 分钟</td><td>同一运动员两场之间的最小间隔，冲突检测用</td></tr>
+  </tbody>
+</table>
+
+<h3 id="s7-2"><span class="num">B</span>常见问题</h3>
+
+<h4>Q：赛事信息填错了怎么改？</h4>
+<p>赛事管理 → 点该赛事的「编辑」。名称、日期、单位都能改。但<b>改了起止日期后，已生成的日程单元不会自动跟着变</b>，需要重新"按赛期生成单元"。</p>
+
+<h4>Q：报名截止了，还有学校要补报？</h4>
+<p>系统没有硬性截止。管理员可以在「报名管理」里代报，或临时把账号给别人让他自己报。补报的记录同样要走审核。<b>但如果已经分完组了，补报的人要重新分组</b>，之前的赛程会作废。</p>
+
+<h4>Q：分组做完了，发现有一支队退赛？</h4>
+<p>不要直接删队。正确做法：如果还没生成赛程，删除队伍后重新分组；<b>如果赛程已生成，把这队参与的场次标记为"弃权"</b>（对方判胜），让它自然打完。中途删队会导致小组赛对阵不完整，积分算不准。</p>
+
+<h4>Q：赛程排乱了，想全部重来？</h4>
+<p>赛程编排 → 点顶部时间逐段清除，或用「清理空槽」清掉没用的槽。要彻底重来，只能先删掉所有已排场次再重新"自动装箱"。<b>已有比分的场次删掉后比分也一起没了</b>，系统会拦一下，但强行删就真没了。</p>
+
+<h4>Q：成绩录错了怎么改？</h4>
+<p>没确认的：直接改，点保存。<br>已确认的：先点「撤销」退回未确认状态，改完再「确认」。<br>已经进统计的：撤销后要重新跑一次团体总分计算（点「重新计算」）。</p>
+
+<h4>Q：学校忘记密码了？</h4>
+<p>赛事组织 → 学校与账号 → 找到该账号 → 点「重置密码」。系统会给一个新密码，转告学校即可。不用删号重建。</p>
+
+<h4>Q：能用手机操作吗？</h4>
+<p>能。手机浏览器打开同一个地址即可。但<b>手机端底部只有 4 个常用入口</b>（总览、报名、赛程、积分榜），像"田径中心""学校与账号""大屏控制"这些要用电脑。</p>
+
+<h4>Q：数据会不会丢？</h4>
+<p>数据存在服务器数据库里，不在浏览器里。换电脑、换手机登录，看到的都是同一份数据。但<b>建议重要赛事期间定期导出</b>：积分榜、名次表、团体总分都有「导出 CSV」，存一份到本地更稳妥。</p>
+
+<h4>Q：能不能导出 Excel？</h4>
+<p>积分榜、团体总分、综合查询都能导出 CSV，用 Excel 或 WPS 打开即可。秩序册可以导出 Word。</p>
+
+<h4>Q：下一届怎么办？要重新建吗？</h4>
+<p>要建新赛事（不能复用旧的），但<b>组别、项目、场地、项目模板库都可以照着上一届快速建</b>。最快的做法是新建赛事后，参照上一届的项目清单，用模板库批量导入。</p>
+
+<h4>Q：为什么改了东西刷新后没变？</h4>
+<p>浏览器缓存。按 <b>Ctrl + F5</b> 强制刷新一次。系统升级后旧页面可能缓存了旧代码，强制刷新就能拿到新版。</p>
+
+<h4>Q：为什么积分榜上有的队"已作废"？</h4>
+<p>该队<b>弃权满 2 次</b>，系统自动把它的全部成绩作废，不再参与排名。这是规程通行做法，如果觉得判重了，去核对那几场是不是误标了弃权。</p>
+
+<h3 id="s7-3"><span class="num">C</span>术语表</h3>
+
+<table>
+  <thead><tr><th style="width:130px">术语</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td><strong>赛事</strong></td><td>一届比赛的总体，比如"2026 年秋季运动会"。所有数据都挂在赛事下面</td></tr>
+    <tr><td><strong>组别</strong></td><td>参赛资格的分组：学段 + 性别。如"初中男子组"</td></tr>
+    <tr><td><strong>项目</strong></td><td>比什么。如"100 米""篮球"。分径赛、田赛、球类三类</td></tr>
+    <tr><td><strong>分组</strong></td><td>编排时把报名的队伍／运动员切成 A 组、B 组。和"组别"不是一回事</td></tr>
+    <tr><td><strong>赛次</strong></td><td>一个项目的一轮比赛，如"100 米预赛""100 米决赛"</td></tr>
+    <tr><td><strong>场次</strong></td><td>具体一场比赛，有双方（球类）或一组人（田径）</td></tr>
+    <tr><td><strong>时间槽</strong></td><td>球类甘特图上的一个格子 = 某场地 + 某时段</td></tr>
+    <tr><td><strong>日程单元</strong></td><td>田径的排期单位 = 某天 + 上午／下午</td></tr>
+    <tr><td><strong>道次</strong></td><td>径赛跑道编号，1–8 道。第 1 道弯道最急</td></tr>
+    <tr><td><strong>种子</strong></td><td>按报名成绩排出的强弱顺序，1 号种子最强。决定对阵和道次</td></tr>
+    <tr><td><strong>轮空</strong></td><td>队伍数为奇数时，某队这一轮没对手，直接算过</td></tr>
+    <tr><td><strong>弃权</strong></td><td>报名了但没参赛。记一场负，累计 2 次全队作废</td></tr>
+    <tr><td><strong>作废</strong></td><td>某队或某场的成绩不计入统计</td></tr>
+    <tr><td><strong>晋级</strong></td><td>从预赛进复赛、从复赛进决赛</td></tr>
+    <tr><td><strong>达级</strong></td><td>成绩达到某个等级标准（二级运动员、优秀等）</td></tr>
+    <tr><td><strong>全能</strong></td><td>几个单项成绩换算成分数后加总排名的项目</td></tr>
+    <tr><td><strong>虚拟组</strong></td><td>把几所学校临时并成一个队参与团体总分排名</td></tr>
+    <tr><td><strong>UUID</strong></td><td>公开页链接里的一串随机字符，用来防止别人猜到链接。可重置</td></tr>
+  </tbody>
+</table>
+
+<hr style="margin:56px 0 28px;border:none;border-top:1px solid var(--line)">
+<p style="font-size:13px;color:var(--ink-3);line-height:1.9">
+  <b style="color:var(--ink-2)">校园体育竞赛管理系统 · 使用说明</b><br>
+  登封市教育局 体卫艺科　2026 年 10 月<br>
+  本手册随系统功能更新而修订。遇到手册未覆盖的情况，以系统界面上的提示为准。
+</p>
+
+</main>
+</div>
+</body>
+</html>
+
