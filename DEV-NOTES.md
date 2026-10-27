@@ -78,6 +78,8 @@ python deploy_fix_1027.py                          # 推内网机 + 腾讯云 + 
 | 7 | 筛选后比赛全部消失（补 band_id/event_item_id）+ 隐藏数量提示 | `routes/schedule.js`、`Schedule.vue` |
 | 8 | 淘汰赛对阵图：公开页 / 大屏 / 赛程编排三处接入 | `BracketTree.vue`、`routes/schedule.js` `/bracket`、`routes/publicMeet.js` |
 | 9 | **P0 止血**：清死代码 441 行 + 旧径赛分组路径弃用标记 | 见下节 |
+| 10 | 清理孤儿数据 10 条（event_item 76-79 / team_entry 45 / heat_group 14 + heat_member 4） | `cleanup_orphans.py` |
+| 11 | **Logo 接入**：favicon / 登录页 / 侧边栏 / 大屏页头四处换为方案 A | `favicon.svg`、`Login.vue`、`Layout.vue`、`Screen.vue` |
 
 ## 五·补、P0 止血（2026-10-27 晚）
 
