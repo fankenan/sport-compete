@@ -11,22 +11,10 @@
       </div>
 
       <nav class="nav">
-        <p class="nav-group">赛事管理</p>
-        <router-link
-          v-for="item in menuMain"
-          :key="item.path"
-          :to="item.path"
-          class="nav-item"
-          :class="{ active: route.path === item.path }"
-        >
-          <t-icon :name="item.icon || 'app'" size="17px" class="nav-ic" />
-          <span>{{ item.label }}</span>
-        </router-link>
-
-        <template v-if="menuSub.length">
-          <p class="nav-group">比赛执行</p>
+        <template v-for="sec in menuSections" :key="sec.name">
+          <p v-if="showGroupTitles" class="nav-group">{{ sec.name }}</p>
           <router-link
-            v-for="item in menuSub"
+            v-for="item in sec.items"
             :key="item.path"
             :to="item.path"
             class="nav-item"
@@ -178,32 +166,67 @@ const compId = ref(store.competitionId);
 const competitionName = ref('');
 const compPickerVisible = ref(false);
 
+/**
+ * 左侧导航菜单
+ *
+ * 分组顺序按「赛事全流程」排：
+ *   总览 → 赛事组织（赛前准备）→ 球类项目 → 田径项目 → 赛事发布 → 个人
+ *
+ * 组内顺序也按实际操作先后：
+ *   赛事组织：建赛事 → 定项目场地 → 发账号 → 报名 → 排裁判
+ *   球类项目：分组 → 赛程 → 赛中看积分榜 → 出最终名次
+ *   田径项目：配置(田径中心) → 排期(日程与秩序册) → 现场(赛中控台) → 录分 → 统计
+ *
+ * mobile: true 的项会进入手机底部导航，取前 4 个。
+ */
 const ALL_MENU = [
-  { path: '/dashboard', label: '赛事总览', icon: 'dashboard', mobile: true, mobileIcon: 'dashboard', group: 'main' },
-  { path: '/competition', label: '赛事管理', icon: 'flag', roles: [1], group: 'main' },
-  { path: '/event-setup', label: '项目与场地', icon: 'app', roles: [1], group: 'main' },
-  { path: '/track', label: '田径中心', icon: 'rocket', roles: [1], group: 'main' },
-  { path: '/schools', label: '学校与账号', icon: 'usergroup', roles: [1], group: 'main' },
-  { path: '/entry', label: '报名管理', icon: 'edit', roles: [1, 2], mobile: true, mobileIcon: 'edit', group: 'main' },
-  { path: '/track-result', label: '成绩录入', icon: 'check-circle', roles: [1, 3], mobile: true, mobileIcon: 'check-circle', group: 'sub' },
-  { path: '/track-race', label: '赛中控台', icon: 'control-platform', roles: [1], mobile: true, mobileIcon: 'control-platform', group: 'sub' },
-  { path: '/track-stats', label: '赛后统计', icon: 'chart-bar', roles: [1], mobile: true, mobileIcon: 'chart-bar', group: 'sub' },
-  { path: '/track-plan', label: '日程与秩序册', icon: 'calendar', roles: [1], group: 'sub' },
-  { path: '/screen-control', label: '大屏控制端', icon: 'precise-monitor', roles: [1], group: 'sub' },
-  { path: '/grouping', label: '分组编排', icon: 'view-list', roles: [1], group: 'sub' },
-  { path: '/schedule', label: '赛程编排', icon: 'time', roles: [1], mobile: true, mobileIcon: 'time', group: 'sub' },
-  { path: '/referee', label: '裁判管理', icon: 'user-circle', roles: [1], group: 'sub' },
-  { path: '/standing', label: '积分榜', icon: 'chart-line', roles: [1, 2], mobile: true, mobileIcon: 'chart-line', group: 'sub' },
-  { path: '/rank', label: '名次表', icon: 'data', roles: [1], group: 'sub' },
-  { path: '/my-schedule', label: '我的赛程', icon: 'star', roles: [3], mobile: true, mobileIcon: 'star', group: 'sub' }
+  // —— 总览 ——
+  { path: '/dashboard', label: '赛事总览', icon: 'dashboard', roles: null, mobile: true, section: '总览' },
+
+  // —— 赛事组织（赛前准备，球类与田径共用）——
+  { path: '/competition', label: '赛事管理', icon: 'flag', roles: [1], section: '赛事组织' },
+  { path: '/event-setup', label: '项目与场地', icon: 'app', roles: [1], section: '赛事组织' },
+  { path: '/schools', label: '学校与账号', icon: 'usergroup', roles: [1], section: '赛事组织' },
+  { path: '/entry', label: '报名管理', icon: 'edit', roles: [1, 2], mobile: true, section: '赛事组织' },
+  { path: '/referee', label: '裁判管理', icon: 'user-circle', roles: [1], section: '赛事组织' },
+
+  // —— 球类项目（循环赛 / 淘汰赛）——
+  { path: '/grouping', label: '分组编排', icon: 'view-list', roles: [1], section: '球类项目' },
+  { path: '/schedule', label: '赛程编排', icon: 'time', roles: [1], mobile: true, section: '球类项目' },
+  // 积分榜 / 名次表 对裁判(3)与学校(2)同样开放：现场查分、赛后核对都需要，
+  // 且移动端底部导航早就给了裁判这两个入口，桌面端原先缺，属权限标注遗漏。
+  { path: '/standing', label: '积分榜', icon: 'chart-line', roles: [1, 2, 3], mobile: true, section: '球类项目' },
+  { path: '/rank', label: '名次表', icon: 'data', roles: [1, 2, 3], section: '球类项目' },
+
+  // —— 田径项目（径赛 / 田赛 / 全能）——
+  { path: '/track', label: '田径中心', icon: 'rocket', roles: [1], section: '田径项目' },
+  { path: '/track-plan', label: '日程与秩序册', icon: 'calendar', roles: [1], section: '田径项目' },
+  { path: '/track-race', label: '赛中控台', icon: 'control-platform', roles: [1], mobile: true, section: '田径项目' },
+  { path: '/track-result', label: '成绩录入', icon: 'check-circle', roles: [1, 3], mobile: true, section: '田径项目' },
+  { path: '/track-stats', label: '赛后统计', icon: 'chart-bar', roles: [1], mobile: true, section: '田径项目' },
+
+  // —— 赛事发布 ——
+  { path: '/screen-control', label: '大屏控制端', icon: 'precise-monitor', roles: [1], section: '赛事发布' },
+
+  // —— 个人 ——
+  { path: '/my-schedule', label: '我的赛程', icon: 'star', roles: [3], mobile: true, section: '个人' }
 ];
+
+const SECTION_ORDER = ['总览', '赛事组织', '球类项目', '田径项目', '赛事发布', '个人'];
 
 const visibleMenu = computed(() =>
   ALL_MENU.filter((i) => !i.roles || i.roles.includes(store.role))
 );
 
-const menuMain = computed(() => visibleMenu.value.filter((i) => i.group === 'main'));
-const menuSub = computed(() => visibleMenu.value.filter((i) => i.group === 'sub'));
+// 按 SECTION_ORDER 分组；某角色看不到任何项的分组整组不显示
+const menuSections = computed(() =>
+  SECTION_ORDER
+    .map((name) => ({ name, items: visibleMenu.value.filter((i) => i.section === name) }))
+    .filter((s) => s.items.length > 0)
+);
+
+// 学校 / 裁判端只有三五项，再套分组标题反而啰嗦，直接平铺
+const showGroupTitles = computed(() => visibleMenu.value.length >= 6);
 
 const mobileMenu = computed(() => {
   if (store.role === 3) {
@@ -371,16 +394,19 @@ watch(() => store.competitionId, (v) => { compId.value = v; });
 }
 
 .nav-group {
-  margin: 12px 0 6px;
-  padding-left: 11px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.32);
-  letter-spacing: 0.5px;
+  margin: 12px 0 4px;
+  padding: 11px 0 0 11px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 1.2px;
   font-weight: 500;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .nav-group:first-child {
   margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .nav-item {
@@ -388,12 +414,12 @@ watch(() => store.competitionId, (v) => { compId.value = v; });
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius-m);
   color: rgba(255, 255, 255, 0.68);
   text-decoration: none;
   font-size: 14px;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
