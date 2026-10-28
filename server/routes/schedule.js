@@ -880,4 +880,121 @@ router.get('/advance-status', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/** 把日期字符串往后推 n 天，返回 YYYY-MM-DD */
+function addDays(dateStr, n) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** 找 >= dateStr 的第一个星期 wd（1=周一 … 7=周日） */
+function firstWeekday(dateStr, wd) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const cur = d.getDay() === 0 ? 7 : d.getDay();
+  return addDays(dateStr, (wd - cur + 7) % 7);
+}
+
+/**
+ * 联赛自动排期：每周一轮 + 主场排在自己学校的场地
+ *
+ * POST /api/schedule/league-auto
+ * { competition_id, event_item_id?, start_date, weekday, base_time?, interval? }
+ *   weekday: 1=周一 … 7=周日，start_date 会被顺延到最近的该星期
+ *   base_time: 每天首场时间，默认 16:00
+ *   interval: 同场地相邻两场的间隔，默认取项目 slot_interval
+ *
+ * 规则：
+ *   - 第 n 轮排在「首个比赛日 + (n-1) 周」
+ *   - 每场排到主队（team_a）所属学校的场地；主队没有场地时退回 1 号场地并给出提示
+ *   - 同一天同一场地有多场（比如男、女各一场）时，依次占用 16:00、16:45… 等时段
+ */
+router.post('/league-auto', roleRequired(1), async (req, res, next) => {
+  try {
+    const { competition_id, event_item_id, start_date, weekday, base_time, interval: intervalIn } = req.body;
+    if (!competition_id || !start_date) return res.json(fail('缺少赛事或起始日期'));
+    const wd = Math.min(7, Math.max(1, Number(weekday) || 4));
+    const baseTime = base_time || '16:00';
+
+    const params = [competition_id];
+    let sql = 'SELECT * FROM match_info WHERE competition_id = ?';
+    if (event_item_id) { sql += ' AND event_item_id = ?'; params.push(event_item_id); }
+    sql += ' ORDER BY round_no, stage, id';
+    const matches = await query(sql, params);
+    if (!matches.length) return res.json(fail('没有可排的比赛，请先在「分组编排」生成小组赛程'));
+
+    const evIds = [...new Set(matches.map((m) => m.event_item_id))];
+    const events = await query(
+      `SELECT * FROM event_item WHERE id IN (${evIds.map(() => '?').join(',')})`, evIds);
+    const interval = Math.max(20, Number(intervalIn) || Number(events[0]?.slot_interval) || 45);
+
+    // 学校 → 主场场地
+    const venues = await query('SELECT * FROM venue WHERE competition_id = ? ORDER BY venue_no', [competition_id]);
+    const venueBySchool = new Map();
+    for (const v of venues) {
+      if (v.host_school_id && !venueBySchool.has(v.host_school_id)) venueBySchool.set(v.host_school_id, v);
+    }
+    if (!venueBySchool.size) {
+      return res.json(fail('还没有把场地关联到学校，无法按「主场在本校」排期。请先到「项目与场地 → 场地管理」把每个场地绑定所属学校'));
+    }
+
+    const teams = await query('SELECT id, school_id FROM team_entry WHERE competition_id = ?', [competition_id]);
+    const teamSchool = new Map(teams.map((t) => [t.id, t.school_id]));
+
+    const first = firstWeekday(start_date, wd);
+    const slotUsed = new Map();   // `${date}|${venueId}` -> 已占用时段数
+    const warnings = [];
+    let placed = 0, newSlots = 0;
+
+    for (const m of matches) {
+      const round = Number(m.round_no) || 1;
+      const dateStr = addDays(first, (round - 1) * 7);
+
+      const homeSchool = teamSchool.get(m.team_a_id);
+      let venue = homeSchool ? venueBySchool.get(homeSchool) : null;
+      if (!venue) {
+        venue = venues[0];
+        warnings.push(`第 ${m.seq_no} 场的主队未绑定主场场地，临时用「${venue.name}」`);
+      }
+
+      const key = `${dateStr}|${venue.id}`;
+      const idx = slotUsed.get(key) || 0;
+      const st = addMinutes(baseTime, idx * interval);
+      const et = addMinutes(st, Math.max(10, interval - 10));
+
+      let slot = await queryOne(
+        `SELECT id FROM schedule_slot
+         WHERE competition_id = ? AND play_date = ? AND venue_id = ? AND start_time = ? LIMIT 1`,
+        [competition_id, dateStr, venue.id, `${st}:00`]);
+
+      if (!slot) {
+        const mx = await queryOne(
+          'SELECT COALESCE(MAX(slot_index),0) AS mx FROM schedule_slot WHERE competition_id=? AND play_date=? AND venue_id=?',
+          [competition_id, dateStr, venue.id]);
+        const ins = await execute(
+          `INSERT INTO schedule_slot (competition_id, play_date, venue_id, slot_index, start_time, end_time, slot_type)
+           VALUES (?,?,?,?,?,?,1)`,
+          [competition_id, dateStr, venue.id, Number(mx?.mx || 0) + 1, `${st}:00`, `${et}:00`]);
+        slot = { id: ins.insertId };
+        newSlots++;
+      }
+
+      await execute('UPDATE match_info SET slot_id = ? WHERE id = ?', [slot.id, m.id]);
+      slotUsed.set(key, idx + 1);
+      placed++;
+    }
+
+    const lastRound = Math.max(...matches.map((m) => Number(m.round_no) || 1));
+    res.json(ok({
+      placed,
+      rounds: lastRound,
+      newSlots,
+      firstDate: first,
+      lastDate: addDays(first, (lastRound - 1) * 7),
+      weekday: wd,
+      warnings: warnings.slice(0, 20)
+    }, `已排 ${placed} 场，共 ${lastRound} 轮，${first} 至 ${addDays(first, (lastRound - 1) * 7)}`));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

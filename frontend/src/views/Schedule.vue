@@ -20,6 +20,7 @@
         <template v-if="arrangeMode === 'auto'">
           <t-button theme="primary" @click="openSlots">生成时间槽</t-button>
           <t-button variant="outline" @click="doPack">自动装箱</t-button>
+          <t-button v-if="homeAway" theme="success" variant="outline" @click="openLeague">联赛排期</t-button>
         </template>
         <template v-else>
           <t-button theme="primary" @click="openManual()">新增场次</t-button>
@@ -394,6 +395,41 @@
       </template>
     </t-dialog>
 
+    <!-- 联赛自动排期：每周一轮 + 主场在本校 -->
+    <t-dialog v-model:visible="leagueVisible" header="联赛自动排期" width="470px" attach="body">
+      <t-alert theme="info" style="margin-bottom: 16px">
+        按「每周一轮」排期：第 n 轮排在起始日期后的第 n−1 周。每场自动排到<strong>主队所在学校</strong>的场地，
+        同一天同一场地有多场（如男、女各一场）时依次占用不同时段。
+      </t-alert>
+      <t-form label-width="100px" :data="leagueForm">
+        <t-form-item label="起始日期">
+          <t-date-picker
+            v-model="leagueForm.start_date"
+            format="YYYY-MM-DD"
+            value-type="YYYY-MM-DD"
+            placeholder="选第一个比赛日"
+            style="width: 100%"
+          />
+        </t-form-item>
+        <t-form-item label="每周比赛日">
+          <t-select v-model="leagueForm.weekday" style="width: 100%">
+            <t-option v-for="w in WEEKDAY_OPTIONS" :key="w.value" :label="w.label" :value="w.value" />
+          </t-select>
+        </t-form-item>
+        <t-form-item label="每天首场">
+          <t-time-picker v-model="leagueForm.base_time" format="HH:mm" />
+        </t-form-item>
+        <t-form-item label="场次间隔">
+          <t-input-number v-model="leagueForm.interval" :min="20" :max="120" :step="5" />
+          <span class="unit">分钟（同场地相邻两场）</span>
+        </t-form-item>
+      </t-form>
+      <template #footer>
+        <t-button variant="outline" @click="leagueVisible = false">取消</t-button>
+        <t-button theme="primary" :loading="leagueSaving" @click="doLeague">开始排期</t-button>
+      </template>
+    </t-dialog>
+
     <!-- 占位对话框 -->
     <t-dialog v-model:visible="blockVisible" header="添加非比赛占位" width="420px" attach="body">
       <t-form label-width="90px" :data="blockForm">
@@ -454,6 +490,16 @@ const slotForm = ref({
 
 const blockVisible = ref(false);
 const blockForm = ref({ play_date: '', venue_id: null, occupation: '', slot_type: 2 });
+
+/* ---------- 联赛自动排期 ---------- */
+const leagueVisible = ref(false);
+const leagueSaving = ref(false);
+const leagueForm = reactive({ start_date: '', weekday: 4, base_time: '16:00', interval: 45 });
+const WEEKDAY_OPTIONS = [
+  { label: '周一', value: 1 }, { label: '周二', value: 2 }, { label: '周三', value: 3 },
+  { label: '周四', value: 4 }, { label: '周五', value: 5 }, { label: '周六', value: 6 },
+  { label: '周日', value: 7 }
+];
 
 /* ---------- 编排方式：自动 / 手动 ---------- */
 const arrangeMode = ref('auto');
@@ -850,6 +896,58 @@ async function doPack() {
     loadGantt();
   } catch (e) {
     message.error(e.message);
+  }
+}
+
+/* ---------- 联赛自动排期（每周一轮 + 主场在本校） ---------- */
+function openLeague() {
+  if (!filterEvent.value) {
+    message.warning('请先在上方「全部项目」里选定项目，联赛排期按项目进行');
+    return;
+  }
+  if (!leagueForm.start_date) {
+    const d = new Date();
+    const p = (x) => String(x).padStart(2, '0');
+    leagueForm.start_date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  leagueVisible.value = true;
+}
+
+async function doLeague() {
+  if (!leagueForm.start_date) {
+    message.warning('请选择起始日期');
+    return;
+  }
+  const wdLabel = (WEEKDAY_OPTIONS.find((w) => w.value === leagueForm.weekday) || {}).label || '';
+  try {
+    await confirm(
+      `将把该项目的全部比赛按「每周${wdLabel}」重排，每场排到主队所在学校的场地。\n该操作会覆盖这些比赛已有的排期，确定继续？`,
+      '联赛自动排期',
+      { confirmBtn: '开始排期', cancelBtn: '取消' }
+    );
+  } catch (e) {
+    return;
+  }
+  leagueSaving.value = true;
+  try {
+    const r = await http.post('/schedule/league-auto', {
+      competition_id: store.competitionId,
+      event_item_id: filterEvent.value,
+      start_date: leagueForm.start_date,
+      weekday: leagueForm.weekday,
+      base_time: String(leagueForm.base_time || '16:00').slice(0, 5),
+      interval: leagueForm.interval
+    });
+    message.success(`已排 ${r.placed} 场，共 ${r.rounds} 轮（${r.firstDate} 至 ${r.lastDate}）`);
+    if (r.warnings && r.warnings.length) {
+      message.warning(r.warnings[0] + (r.warnings.length > 1 ? `　等 ${r.warnings.length} 条提示` : ''));
+    }
+    leagueVisible.value = false;
+    loadGantt();
+  } catch (e) {
+    message.error(e.message);
+  } finally {
+    leagueSaving.value = false;
   }
 }
 
