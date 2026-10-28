@@ -234,16 +234,18 @@ router.put('/team/:id', async (req, res, next) => {
     }
 
     await execute(
-      'UPDATE team_entry SET band_id=?, event_item_id=?, team_name=?, leader_name=?, coach_name=?, roster_json=? WHERE id=?',
+      'UPDATE team_entry SET band_id=?, event_item_id=?, team_name=?, leader_name=?, coach_name=?, roster_json=?, status=? WHERE id=?',
       [newBand,
        newItem,
        team_name != null && team_name !== '' ? team_name : entry.team_name,
        leader_name !== undefined ? leader_name : entry.leader_name,
        coach_name !== undefined ? coach_name : entry.coach_name,
        roster !== undefined ? (roster ? JSON.stringify(roster) : null) : entry.roster_json,
+       // 改了组别或项目，参赛资格就变了，退回待审核重走一遍
+       changed ? 1 : entry.status,
        req.params.id]
     );
-    res.json(ok(null, '已保存'));
+    res.json(ok({ needAudit: changed }, changed ? '已保存，需重新审核' : '已保存'));
   } catch (e) { next(e); }
 });
 
@@ -291,10 +293,13 @@ router.put('/athlete-entry/:id', async (req, res, next) => {
     }
 
     await execute(
-      'UPDATE athlete_entry SET band_id=?, event_item_id=?, athlete_id=? WHERE id=?',
-      [newBand, newItem, newAthlete, req.params.id]
+      'UPDATE athlete_entry SET band_id=?, event_item_id=?, athlete_id=?, status=? WHERE id=?',
+      [newBand, newItem, newAthlete,
+       // 组别 / 项目 / 运动员任一变动，都退回待审核
+       changed ? 1 : row.status,
+       req.params.id]
     );
-    res.json(ok(null, '已保存'));
+    res.json(ok({ needAudit: changed }, changed ? '已保存，需重新审核' : '已保存'));
   } catch (e) { next(e); }
 });
 

@@ -1354,8 +1354,8 @@ async function submitTeam() {
       roster: rosterPayload
     };
     if (teamForm.id) {
-      await http.put(`/entry/team/${teamForm.id}`, payload);
-      message.success('已保存');
+      const r = await http.put(`/entry/team/${teamForm.id}`, payload);
+      message.success(r?.needAudit ? '已保存，需重新审核' : '已保存');
     } else {
       await http.post('/entry/team', payload);
       message.success('报名已提交，等待审核');
@@ -1559,12 +1559,12 @@ async function submitEntry() {
   saving.value = true;
   try {
     if (entryForm.id) {
-      await http.put(`/entry/athlete-entry/${entryForm.id}`, {
+      const r = await http.put(`/entry/athlete-entry/${entryForm.id}`, {
         band_id: entryForm.band_id,
         athlete_id: entryForm.athlete_id,
         event_item_id: entryForm.event_item_id
       });
-      message.success('已保存');
+      message.success(r?.needAudit ? '已保存，需重新审核' : '已保存');
     } else {
       await http.post('/entry/athlete', {
         competition_id: store.competitionId,
