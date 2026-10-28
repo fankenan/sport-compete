@@ -595,7 +595,14 @@ function buildOrderHtml(book, data, forWord) {
   const css = `
     <style>
       body{font-family:'Microsoft YaHei',SimSun,sans-serif;margin:0;padding:0;}
-      .page{padding:36px 40px;}
+      .page{padding:36px 40px;position:relative;z-index:1;}
+      /* 赛事水印：固定在视口上，打印时每页都会重复出现 */
+      .wm-layer{position:fixed;inset:0;pointer-events:none;display:flex;flex-wrap:wrap;
+        align-items:center;justify-content:center;gap:74px 46px;transform:rotate(-28deg);
+        overflow:hidden;font-size:24px;font-weight:700;letter-spacing:2px;
+        color:rgba(0,0,0,0.055);z-index:0;}
+      .wm-layer span{white-space:nowrap;}
+      @media print{.wm-layer{position:fixed;}}
       h1{text-align:center;font-size:30px;margin:60px 0 10px;}
       .sub{text-align:center;font-size:15px;color: var(--app-text-2);margin-bottom:40px;}
       h2{font-size: 20px;border-left:4px solid var(--td-brand-color);padding-left:10px;margin:26px 0 12px;}
@@ -608,8 +615,19 @@ function buildOrderHtml(book, data, forWord) {
     </style>`;
   let body = '';
 
+  // 水印文字取赛事全称
+  const wmLabel = String(c.name || title || '').trim();
+  // 预览/打印：整层平铺（fixed 在打印时每页重复）
+  // 导出 Word：Word 对 fixed + rotate 支持差，改成每页右上角浅色标注
+  const wmLayer = (!forWord && wmLabel)
+    ? `<div class="wm-layer">${Array.from({ length: 14 }, () => `<span>${wmLabel}</span>`).join('')}</div>`
+    : '';
+
   for (const s of enabled) {
     body += `<div class="page${forWord ? ' pb' : ''}">`;
+    if (forWord && wmLabel) {
+      body += `<div style="position:absolute;top:10px;right:16px;font-size:11px;color:#c9c9c9;letter-spacing:1px">${wmLabel}</div>`;
+    }
     if (s.code === 'COVER') {
       body += `<h1>${title}</h1><div class="sub">${book?.subtitle || ''}</div>
                <div class="cover-note">${book?.cover_note || ''}</div>
@@ -683,7 +701,7 @@ function buildOrderHtml(book, data, forWord) {
     body += `</div>`;
   }
   body += `<div class="foot">${title}</div>`;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>${css}</head><body>${body}</body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>${css}</head><body>${wmLayer}${body}</body></html>`;
 }
 
 // ---------- 奖状 ----------

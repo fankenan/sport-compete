@@ -10,6 +10,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const { attachWatermark } = require('./watermark');
 
 const FONT_DIR = path.join(__dirname, '..', 'fonts');
 const FONT_BOLD = path.join(FONT_DIR, 'deng_bold.ttf');
@@ -132,6 +133,9 @@ function buildRosterPdf({ competitionName, rows, title }) {
     doc.registerFont('cnBold', 'Helvetica-Bold');
     doc.registerFont('cn', 'Helvetica');
   }
+
+  // 赛事水印：每页底层平铺，压低透明度不影响阅读
+  attachWatermark(doc, competitionName, { font: 'cn' });
 
   const mainTitle = title || `${competitionName}运动员名单`;
   const data = rows || [];

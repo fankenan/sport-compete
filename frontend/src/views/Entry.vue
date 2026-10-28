@@ -396,7 +396,7 @@
             <t-radio :value="2">女</t-radio>
           </t-radio-group>
         </t-form-item>
-        <t-form-item label="班级" name="class_name">
+        <t-form-item label="班级" name="class_name" :help="gradeHint">
           <div class="class-row">
             <t-select
               v-model="athleteForm.grade"
@@ -416,9 +416,6 @@
               @change="syncClassName"
             />
           </div>
-          <p class="class-tip">
-            {{ gradeHint }}
-          </p>
         </t-form-item>
         <t-form-item label="学号" name="student_no">
           <t-input v-model="athleteForm.student_no" placeholder="选填" :maxlength="32" />
@@ -1733,13 +1730,16 @@ watch(() => store.competitionId, (v) => {
 
 .class-row {
   display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
   width: 100%;
+  min-width: 0;
 }
 
 .class-grade,
 .class-no {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
 

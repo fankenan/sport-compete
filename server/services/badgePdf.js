@@ -11,6 +11,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const { attachWatermark } = require('./watermark');
 
 const FONT_DIR = path.join(__dirname, '..', 'fonts');
 const FONT_BOLD = path.join(FONT_DIR, 'deng_bold.ttf');
@@ -175,6 +176,9 @@ function buildBadgePdf({ competitionName, cards }) {
     doc.registerFont('cnBold', 'Helvetica-Bold');
     doc.registerFont('cn', 'Helvetica');
   }
+
+  // 赛事水印：每页底层平铺（参赛证透明度更低一些，避免干扰卡片內容）
+  attachWatermark(doc, competitionName, { font: 'cn', opacity: 0.045 });
 
   if (!cards || cards.length === 0) {
     doc.fillColor(C_TEXT).font('cn').fontSize(12)
