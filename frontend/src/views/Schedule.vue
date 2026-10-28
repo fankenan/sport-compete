@@ -123,7 +123,7 @@
                   @click="onCellClick(grp.date, row.time, v, $event)"
                   @dragover.prevent="onDragOver(grp.date, row.time, v.venue_no)"
                   @dragenter.prevent="onDragOver(grp.date, row.time, v.venue_no)"
-                  @dragleave="onDragLeave(grp.date, row.time, v.venue_no)"
+                  @dragleave="onDragLeave($event, grp.date, row.time, v.venue_no)"
                   @drop.prevent="onDrop(grp.date, row.time, v)"
                 >
                   <div
@@ -591,10 +591,20 @@ const dateGroups = computed(() => {
 });
 
 /** 取某个日期、某个时间点、某个场地的所有槽（用于显示） */
+/** 渲染用（已按筛选裁剪）的槽位索引，同样避免 O(格子数×槽位数) 的重复 filter */
+const ganttIndex = computed(() => {
+  const m = new Map();
+  for (const c of gantt.value.cells || []) {
+    const k = `${c.date}|${c.start_time}|${c.venue_no}`;
+    const arr = m.get(k);
+    if (arr) arr.push(c);
+    else m.set(k, [c]);
+  }
+  return m;
+});
+
 function cellsAt(date, time, venueNo) {
-  return gantt.value.cells.filter(
-    (c) => c.date === date && c.start_time === time && c.venue_no === venueNo
-  );
+  return ganttIndex.value.get(`${date}|${time}|${venueNo}`) || [];
 }
 
 /* ---------- 拖拽改场地 / 时间 ---------- */
@@ -608,10 +618,20 @@ function cellKey(date, time, venueNo) {
 }
 
 /** 用未筛选数据判断目标格能不能放（避免筛选把占用场次藏起来导致误判） */
+/** 槽位按「日期|时间|场地号」建索引，避免每次渲染都对全量 cells 做 filter */
+const slotIndex = computed(() => {
+  const m = new Map();
+  for (const c of ganttRaw.value.cells || []) {
+    const k = `${c.date}|${c.start_time}|${c.venue_no}`;
+    const arr = m.get(k);
+    if (arr) arr.push(c);
+    else m.set(k, [c]);
+  }
+  return m;
+});
+
 function slotsAt(date, time, venueNo) {
-  return ganttRaw.value.cells.filter(
-    (c) => c.date === date && c.start_time === time && c.venue_no === venueNo
-  );
+  return slotIndex.value.get(`${date}|${time}|${venueNo}`) || [];
 }
 
 /** 返回 { ok, reason }：ok=true 可落位 */
@@ -653,10 +673,16 @@ function onDragEnd() {
 
 function onDragOver(date, time, venueNo) {
   if (!dragMatch.value) return;
-  dragOverKey.value = cellKey(date, time, venueNo);
+  const k = cellKey(date, time, venueNo);
+  // dragover 触发极频繁，值没变就不要动 ref（避免无谓的组件重渲染）
+  if (dragOverKey.value !== k) dragOverKey.value = k;
 }
 
-function onDragLeave(date, time, venueNo) {
+function onDragLeave(e, date, time, venueNo) {
+  // dragleave 在「格子 → 格子内子元素」移动时也会触发，
+  // 不判断 relatedTarget 会导致 dragOverKey 反复清空/置位 → 整表闪烁
+  const to = e && e.relatedTarget;
+  if (to && e.currentTarget && e.currentTarget.contains(to)) return;
   if (dragOverKey.value === cellKey(date, time, venueNo)) dragOverKey.value = '';
 }
 
@@ -1373,7 +1399,9 @@ watch(() => store.competitionId, () => {
   cursor: pointer;
   background: var(--app-bg-2);
   border: 1px solid transparent;
-  transition: all 0.15s;
+  /* 不能用 transition: all —— cursor 进入过渡列表后，
+     hover 时 Chrome 会反复重算光标，表现为指针狂闪；只过渡真正会变的两个属性 */
+  transition: border-color 0.15s ease, background-color 0.15s ease;
   overflow: hidden;
 }
 
@@ -1383,7 +1411,9 @@ watch(() => store.competitionId, () => {
 }
 
 /* ---------- 拖拽改场地 / 时间 ---------- */
-.slot[draggable='true'] {
+/* 可拖动槽位的光标优先级高于 :hover，避免 pointer/grab 来回切换 */
+.slot[draggable='true'],
+.slot[draggable='true']:hover {
   cursor: grab;
 }
 
