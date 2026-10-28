@@ -6,6 +6,7 @@ const express = require('express');
 const { query, queryOne, execute, ok, fail } = require('../db');
 const { authRequired, roleRequired } = require('../middleware/auth');
 const timetable = require('../services/timetable');
+const { buildOrderBookPdf } = require('../services/orderBookPdf');
 
 const router = express.Router();
 router.use(authRequired);
@@ -320,11 +321,9 @@ router.put('/order-book', roleRequired(1), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/** GET /api/track-plan/order-book/data 取各章节的实际内容 */
-router.get('/order-book/data', async (req, res, next) => {
-  try {
-    const cid = req.query.competition_id;
-    const comp = await queryOne(
+/** 取出秩序册各章节所需的全部数据（前端预览与后端 PDF 共用） */
+async function loadOrderBookData(cid) {
+  const comp = await queryOne(
       `SELECT id, name, year, start_date, end_date, host_unit, venue, contact_person, contact_phone,
               meet_level, minimum_rest_minutes, straight_lane_count, curve_lane_count
          FROM competition WHERE id = ?`, [cid]
@@ -400,7 +399,37 @@ router.get('/order-book/data', async (req, res, next) => {
         ORDER BY e.sort_no`, [cid]
     );
 
-    res.json(ok({ competition: comp, schools, athletes, timetable: items, heats, records }));
+  return { competition: comp, schools, athletes, timetable: items, heats, records };
+}
+
+/** GET /api/track-plan/order-book/data 取各章节的实际内容 */
+router.get('/order-book/data', async (req, res, next) => {
+  try {
+    res.json(ok(await loadOrderBookData(req.query.competition_id)));
+  } catch (e) { next(e); }
+});
+
+/** GET /api/track-plan/order-book/pdf 直接下载带水印的秩序册 PDF */
+router.get('/order-book/pdf', async (req, res, next) => {
+  try {
+    const cid = req.query.competition_id;
+    let book = await queryOne('SELECT * FROM order_book WHERE competition_id = ?', [cid]);
+    if (!book) {
+      book = { competition_id: Number(cid), title: null, subtitle: null, sections_json: DEFAULT_SECTIONS };
+    }
+    book.sections_json = parseJson(book.sections_json, DEFAULT_SECTIONS);
+
+    const data = await loadOrderBookData(cid);
+    if (!data.competition) return res.json(fail('赛事不存在'));
+
+    const name = book.title || data.competition.name || '秩序册';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(name)}.pdf`);
+
+    const pdf = buildOrderBookPdf({ book, data });
+    pdf.pipe(res);
+    pdf.on('error', next);
   } catch (e) { next(e); }
 });
 

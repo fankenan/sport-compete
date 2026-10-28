@@ -92,7 +92,10 @@
               <div style="margin-top:12px">
                 <t-button theme="primary" @click="saveOrderBook">保存编排</t-button>
                 <t-button variant="outline" style="margin-left:8px" @click="genOrderBook">生成秩序册</t-button>
-                <t-button variant="outline" style="margin-left:8px" @click="previewOrder">预览 / 打印</t-button>
+                <t-button theme="primary" style="margin-left:8px" :loading="pdfLoading" @click="downloadOrderPdf">
+                  下载 PDF
+                </t-button>
+                <t-button variant="outline" style="margin-left:8px" @click="previewOrder">网页预览</t-button>
                 <t-button variant="outline" style="margin-left:8px" @click="exportOrder">导出 Word</t-button>
               </div>
             </t-card>
@@ -572,6 +575,31 @@ async function previewOrder() {
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
+}
+
+/** 直接下载带赛事水印的秩序册 PDF（正式打印用这个） */
+const pdfLoading = ref(false);
+async function downloadOrderPdf() {
+  pdfLoading.value = true;
+  try {
+    const blob = await http.get('/track-plan/order-book/pdf', {
+      params: { competition_id: compId.value },
+      responseType: 'blob'
+    });
+    const d = await http.get('/track-plan/order-book', { params: { competition_id: compId.value } });
+    const name = (d && d.title) || '秩序册';
+    const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    MessagePlugin.success('PDF 已生成（含赛事水印）');
+  } catch (e) {
+    MessagePlugin.error(e.message || '生成失败');
+  } finally {
+    pdfLoading.value = false;
+  }
 }
 
 async function exportOrder() {
