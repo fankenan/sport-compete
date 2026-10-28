@@ -80,36 +80,46 @@
         <!-- 个人报名 -->
         <t-tab-panel value="athletes" label="个人报名">
           <div class="tb-row">
-            <t-select v-model="filterBand" placeholder="全部组别" clearable size="small" style="width: 140px" @change="loadAthletes">
+            <t-select v-model="filterBand" placeholder="全部组别" clearable size="small" style="width: 140px" @change="onEntryFilterChange">
               <t-option v-for="b in bands" :key="b.id" :label="bandLabel(b)" :value="b.id" />
             </t-select>
-<t-select v-model="filterEvent" placeholder="全部项目" clearable size="small" style="width: 140px" @change="loadAthletes">
-          <t-option v-for="e in events" :key="e.id" :label="e.name" :value="e.id" />
-        </t-select>
-        <t-select
-          v-if="store.isAdmin"
-          v-model="filterSchool"
-          placeholder="全部学校"
-          clearable
-          filterable
-          size="small"
-          style="width: 180px"
-          @change="loadAthletes"
-        >
-          <t-option v-for="s in schools" :key="s.id" :label="s.short_name || s.name" :value="s.id" />
-        </t-select>
-        <t-select
-          v-if="!store.isAdmin"
-          v-model="compId"
-          placeholder="选择赛事"
-          size="small"
-          style="width: 200px"
-          @change="onCompChange"
-        >
-          <t-option v-for="c in competitions" :key="c.id" :label="c.name" :value="Number(c.id)" />
-        </t-select>
-        <t-button v-if="store.isSchool" theme="primary" @click="openAthleteEntry">报项</t-button>
+            <t-select v-model="filterEvent" placeholder="全部项目" clearable size="small" style="width: 140px" @change="onEntryFilterChange">
+              <t-option v-for="e in events" :key="e.id" :label="e.name" :value="e.id" />
+            </t-select>
+            <t-select
+              v-if="store.isAdmin"
+              v-model="filterSchool"
+              placeholder="全部学校"
+              clearable
+              filterable
+              size="small"
+              style="width: 180px"
+              @change="onEntryFilterChange"
+            >
+              <t-option v-for="s in schools" :key="s.id" :label="s.short_name || s.name" :value="s.id" />
+            </t-select>
+            <t-select
+              v-if="!store.isAdmin"
+              v-model="compId"
+              placeholder="选择赛事"
+              size="small"
+              style="width: 200px"
+              @change="onCompChange"
+            >
+              <t-option v-for="c in competitions" :key="c.id" :label="c.name" :value="Number(c.id)" />
+            </t-select>
+            <t-button v-if="store.isSchool" theme="primary" @click="openAthleteEntry">报项</t-button>
+            <template v-if="store.isAdmin">
+              <t-button theme="success" variant="outline" :disabled="!selectedEntryRows.length" @click="batchAuditAthlete(2)">
+                批量通过{{ selectedEntryRows.length ? `(${selectedEntryRows.length})` : '' }}
+              </t-button>
+              <t-button theme="danger" variant="outline" :disabled="!selectedEntryRows.length" @click="batchAuditAthlete(3)">
+                批量驳回
+              </t-button>
+              <t-button theme="success" variant="outline" @click="auditAllPending">全部通过</t-button>
+            </template>
             <t-button @click="loadAthletes">刷新</t-button>
+            <span class="tb-hint">共 {{ entryTotal }} 条，每页 {{ entryPageSize }} 条</span>
           </div>
 
           <div class="table-scroll">
@@ -120,6 +130,7 @@
               :loading="loadingAthletes"
               :empty="'暂无数据'"
               hover
+              @select-change="(keys, ctx) => (selectedEntryRows = ctx?.selectedRowData || [])"
             >
               <template #gender="{ row }">{{ row.gender === 2 ? '女' : '男' }}</template>
               <template #class_name="{ row }">
@@ -142,6 +153,17 @@
                 </template>
               </template>
             </t-table>
+          </div>
+
+          <div class="pager">
+            <t-pagination
+              v-model="entryPage"
+              :total="entryTotal"
+              :page-size="entryPageSize"
+              :show-page-size="false"
+              :show-jumper="true"
+              @change="loadAthletes"
+            />
           </div>
         </t-tab-panel>
 
@@ -574,6 +596,12 @@ const filterStatus = ref(null);
 const filterSchool = ref(null);
 const selectedRows = ref([]);
 
+// 个人报名的分页与多选（数据量大，不能一次全拉）
+const selectedEntryRows = ref([]);
+const entryPage = ref(1);
+const entryPageSize = 20;
+const entryTotal = ref(0);
+
 const teamDialog = ref(false);
 const athleteDialog = ref(false);
 const entryDialog = ref(false);
@@ -598,7 +626,9 @@ const teamColumns = computed(() => {
 });
 
 const athleteColumns = computed(() => {
-  const cols = [
+  const cols = [];
+  if (store.isAdmin) cols.push({ colKey: 'row-select', type: 'multiple', width: 42 });
+  cols.push(
     { colKey: 'school_name', title: '学校', minWidth: 140, ellipsis: true },
     { colKey: 'band_label', title: '组别', width: 90, align: 'center' },
     { colKey: 'event_name', title: '项目', minWidth: 110, ellipsis: true },
@@ -608,7 +638,7 @@ const athleteColumns = computed(() => {
     { colKey: 'student_no', title: '学号', width: 110 },
     { colKey: 'bib_no', title: '号码', width: 80, align: 'center' },
     { colKey: 'status', title: '状态', width: 90, align: 'center' }
-  ];
+  );
   if (store.isAdmin) cols.push({ colKey: 'ops', title: '操作', width: 210, align: 'center', fixed: 'right' });
   return cols;
 });
@@ -1058,14 +1088,25 @@ async function loadAthletes() {
   if (!store.competitionId) return;
   loadingAthletes.value = true;
   try {
-    athletes.value = await http.get('/entry/athlete-list', {
+    const d = await http.get('/entry/athlete-list', {
       params: {
         competition_id: store.competitionId,
         band_id: filterBand.value || undefined,
         event_item_id: filterEvent.value || undefined,
-        school_id: filterSchool.value || undefined
+        school_id: filterSchool.value || undefined,
+        page: entryPage.value,
+        page_size: entryPageSize
       }
     });
+    // 分页接口返回 { list, total }；兼容旧的全量数组返回
+    if (Array.isArray(d)) {
+      athletes.value = d;
+      entryTotal.value = d.length;
+    } else {
+      athletes.value = d.list || [];
+      entryTotal.value = d.total || 0;
+    }
+    selectedEntryRows.value = [];
   } catch (e) {
     message.error(e.message);
   } finally {
@@ -1583,6 +1624,51 @@ async function submitEntry() {
   }
 }
 
+/** 个人报名筛选变化：回到第一页再查 */
+function onEntryFilterChange() {
+  entryPage.value = 1;
+  loadAthletes();
+}
+
+/** 批量审核勾选的报名 */
+async function batchAuditAthlete(status) {
+  const ids = selectedEntryRows.value.map((r) => r.id);
+  if (!ids.length) return;
+  try {
+    const r = await http.post('/entry/athlete-audit-batch', { ids, status });
+    message.success(`已处理 ${r?.count || ids.length} 条`);
+    loadAthletes();
+  } catch (e) {
+    message.error(e.message);
+  }
+}
+
+/** 把当前筛选条件下所有「待审核」一次性通过 */
+async function auditAllPending() {
+  try {
+    await confirm(
+      '将把当前筛选条件下所有「待审核」的个人报名一次性通过。\n这个操作不能一键撤销，请先确认上面的组别/项目/学校筛选无误。',
+      '全部通过',
+      { confirmBtn: '确认全部通过', cancelBtn: '取消' }
+    );
+  } catch (e) {
+    return;
+  }
+  try {
+    const r = await http.post('/entry/athlete-audit-batch', {
+      status: 2,
+      competition_id: store.competitionId,
+      band_id: filterBand.value || undefined,
+      event_item_id: filterEvent.value || undefined,
+      school_id: filterSchool.value || undefined
+    });
+    message.success(`已通过 ${r?.count || 0} 条`);
+    loadAthletes();
+  } catch (e) {
+    message.error(e.message);
+  }
+}
+
 watch(activeTab, (v) => {
   if (v === 'teams') loadTeams();
   if (v === 'athletes') loadAthletes();
@@ -1601,6 +1687,7 @@ onMounted(() => {
 });
 watch(() => store.competitionId, (v) => {
   compId.value = v;
+  entryPage.value = 1;   // 换赛事回到第一页
   loadBase();
   loadTeams();
   loadAthletes();
@@ -1626,6 +1713,12 @@ watch(() => store.competitionId, (v) => {
 .tb-hint {
   font-size: 12px;
   color: var(--app-text-3);
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 2px 2px;
 }
 
 .idcard-wrap {

@@ -222,6 +222,20 @@ async function generateSlots(competitionId, playDates, cfg) {
   const pmStart = cfg.pmStart || '13:30';
   const slotCount = cfg.slotCount || 10;   // 上午 5 + 下午 5
 
+  // 下午必须晚于上午，否则两个时段会算出同一批时间，产生重复槽
+  if (pmStart <= amStart) {
+    throw new Error(`下午开始时间（${pmStart}）应晚于上午（${amStart}），否则两个时段会重叠`);
+  }
+
+  // 已有比赛排在槽上时不能清空，否则 match_info.slot_id 会变成孤儿
+  const used = await queryOne(
+    `SELECT COUNT(*) AS c FROM match_info mi
+     JOIN schedule_slot ss ON ss.id = mi.slot_id
+     WHERE ss.competition_id = ?`, [competitionId]);
+  if (used && Number(used.c) > 0) {
+    throw new Error('已有比赛排在这些时间槽上，请先在「赛程编排」清空场次，再重新生成时间槽');
+  }
+
   // 清空旧槽位
   await execute('DELETE FROM schedule_slot WHERE competition_id = ?', [competitionId]);
 
@@ -233,7 +247,9 @@ async function generateSlots(competitionId, playDates, cfg) {
     for (const venue of venues) {
       for (let i = 1; i <= slotCount; i++) {
         const isPm = i > half;
-        const idxInHalf = isPm ? i - half : i - 1;
+        // 上午 i-1、下午 i-half-1：下午第一槽必须正好是 pmStart，
+        // 少减 1 会让下午整体前移一格，和上午的时间撞车（产生同日同时刻两条槽）
+        const idxInHalf = isPm ? i - half - 1 : i - 1;
         const start = addMinutes(isPm ? pmStart : amStart, idxInHalf * interval);
         const end = addMinutes(start, interval - 10);
         const res = await execute(

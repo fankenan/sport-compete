@@ -127,7 +127,7 @@ router.get('/list', async (req, res, next) => {
  */
 router.get('/athlete-list', async (req, res, next) => {
   try {
-    const { competition_id, band_id, event_item_id, school_id } = req.query;
+    const { competition_id, band_id, event_item_id, school_id, page, page_size } = req.query;
     const scopeId = scopeSchoolId(req);
 
     const where = ['ae.competition_id = ?'];
@@ -138,24 +138,87 @@ router.get('/athlete-list', async (req, res, next) => {
     if (band_id) { where.push('ae.band_id = ?'); params.push(band_id); }
     if (event_item_id) { where.push('ae.event_item_id = ?'); params.push(event_item_id); }
 
-    const rows = await query(
-      `SELECT ae.*, a.name, a.gender, a.class_name, a.student_no, a.bib_no,
-              s.name AS school_name, gb.stage, gb.gender AS band_gender, gb.label AS band_label,
-              ei.name AS event_name,
-              EXISTS(SELECT 1 FROM heat_entry he
-                     WHERE he.athlete_id = ae.athlete_id
-                       AND he.event_item_id = ae.event_item_id
-                       AND he.competition_id = ae.competition_id) AS has_heat
+    const fromSql = `
        FROM athlete_entry ae
        JOIN athlete a ON a.id = ae.athlete_id
        JOIN school s ON s.id = a.school_id
        JOIN group_band gb ON gb.id = ae.band_id
        JOIN event_item ei ON ei.id = ae.event_item_id
-       WHERE ${where.join(' AND ')}
-       ORDER BY gb.stage, gb.gender, ei.name, s.name, a.name`,
-      params
-    );
+       WHERE ${where.join(' AND ')}`;
+
+    const selectSql = `
+       SELECT ae.*, a.name, a.gender, a.class_name, a.student_no, a.bib_no,
+              s.name AS school_name, gb.stage, gb.gender AS band_gender, gb.label AS band_label,
+              ei.name AS event_name,
+              EXISTS(SELECT 1 FROM heat_entry he
+                     WHERE he.athlete_id = ae.athlete_id
+                       AND he.event_item_id = ae.event_item_id
+                       AND he.competition_id = ae.competition_id) AS has_heat`;
+
+    const orderSql = ' ORDER BY gb.stage, gb.gender, ei.name, s.name, a.name';
+
+    // 传了 page 就分页（个人报名动辄上千条，全量返回很慢）
+    if (page != null && page !== '') {
+      const p = Math.max(1, Number(page) || 1);
+      const ps = Math.min(200, Math.max(1, Number(page_size) || 20));
+      const cntRow = await queryOne(`SELECT COUNT(*) AS c ${fromSql}`, params);
+      const rows = await query(
+        `${selectSql} ${fromSql} ${orderSql} LIMIT ? OFFSET ?`,
+        [...params, ps, (p - 1) * ps]
+      );
+      return res.json(ok({
+        list: rows.map((r) => ({ ...r, band_label: bandLabel(r) })),
+        total: Number(cntRow?.c || 0),
+        page: p,
+        page_size: ps
+      }));
+    }
+
+    // 未传分页参数：保持原有「返回全量数组」的行为
+    const rows = await query(`${selectSql} ${fromSql} ${orderSql}`, params);
     res.json(ok(rows.map((r) => ({ ...r, band_label: bandLabel(r) }))));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 个人报名批量审核
+ * 两种用法：
+ *   1) 传 ids 数组 —— 审核勾选的若干条
+ *   2) 不传 ids、传 competition_id（+可选 band_id/event_item_id/school_id）——
+ *      按当前筛选条件把所有「待审核」一次性处理（个人报名动辄上千条，逐条勾选不现实）
+ */
+router.post('/athlete-audit-batch', roleRequired(1), async (req, res, next) => {
+  try {
+    const { ids, status, competition_id, band_id, event_item_id, school_id } = req.body;
+    const st = Number(status) === 3 ? 3 : 2;
+
+    let targetIds = [];
+    if (Array.isArray(ids) && ids.length > 0) {
+      targetIds = ids.map(Number);
+    } else if (competition_id) {
+      const where = ['ae.competition_id = ?', 'ae.status = 1'];
+      const params = [competition_id];
+      if (band_id) { where.push('ae.band_id = ?'); params.push(band_id); }
+      if (event_item_id) { where.push('ae.event_item_id = ?'); params.push(event_item_id); }
+      if (school_id) { where.push('a.school_id = ?'); params.push(school_id); }
+      const rows = await query(
+        `SELECT ae.id FROM athlete_entry ae JOIN athlete a ON a.id = ae.athlete_id
+         WHERE ${where.join(' AND ')}`, params);
+      targetIds = rows.map((r) => r.id);
+    }
+
+    if (!targetIds.length) return res.json(fail('没有需要处理的报名'));
+
+    // 分批更新，避免单条 SQL 过长
+    let done = 0;
+    for (let i = 0; i < targetIds.length; i += 500) {
+      const chunk = targetIds.slice(i, i + 500);
+      await execute(
+        `UPDATE athlete_entry SET status = ? WHERE id IN (${chunk.map(() => '?').join(',')})`,
+        [st, ...chunk]);
+      done += chunk.length;
+    }
+    res.json(ok({ count: done }, `已处理 ${done} 条`));
   } catch (e) { next(e); }
 });
 
