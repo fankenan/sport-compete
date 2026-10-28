@@ -107,7 +107,8 @@ router.get('/list', async (req, res, next) => {
 
     const rows = await query(
       `SELECT te.*, s.name AS school_name, gb.stage, gb.gender, gb.label AS band_label,
-              ei.name AS event_name, ei.category
+              ei.name AS event_name, ei.category,
+              EXISTS(SELECT 1 FROM match_info mi WHERE mi.team_a_id = te.id OR mi.team_b_id = te.id) AS has_match
        FROM team_entry te
        JOIN school s ON s.id = te.school_id
        JOIN group_band gb ON gb.id = te.band_id
@@ -140,7 +141,11 @@ router.get('/athlete-list', async (req, res, next) => {
     const rows = await query(
       `SELECT ae.*, a.name, a.gender, a.class_name, a.student_no, a.bib_no,
               s.name AS school_name, gb.stage, gb.gender AS band_gender, gb.label AS band_label,
-              ei.name AS event_name
+              ei.name AS event_name,
+              EXISTS(SELECT 1 FROM heat_entry he
+                     WHERE he.athlete_id = ae.athlete_id
+                       AND he.event_item_id = ae.event_item_id
+                       AND he.competition_id = ae.competition_id) AS has_heat
        FROM athlete_entry ae
        JOIN athlete a ON a.id = ae.athlete_id
        JOIN school s ON s.id = a.school_id
@@ -199,15 +204,95 @@ router.post('/team', async (req, res, next) => {
  */
 router.put('/team/:id', async (req, res, next) => {
   try {
-    const { team_name, leader_name, coach_name, roster } = req.body;
+    const { team_name, leader_name, coach_name, roster, band_id, event_item_id } = req.body;
     const entry = await queryOne('SELECT * FROM team_entry WHERE id = ?', [req.params.id]);
     if (!entry) return res.json(fail('报名不存在'));
     if (req.user.role === 2 && entry.school_id !== req.user.school_id) {
       return res.json(fail('无权修改其他学校的报名'));
     }
+
+    // 组别 / 项目：不传则保持原值
+    const newBand = band_id != null && band_id !== '' ? Number(band_id) : entry.band_id;
+    const newItem = event_item_id != null && event_item_id !== '' ? Number(event_item_id) : entry.event_item_id;
+    const changed = newBand !== entry.band_id || newItem !== entry.event_item_id;
+
+    if (changed) {
+      // 已进入赛程的不能改，否则场次会对不上
+      const used = await queryOne(
+        'SELECT id FROM match_info WHERE team_a_id = ? OR team_b_id = ? LIMIT 1',
+        [req.params.id, req.params.id]
+      );
+      if (used) {
+        return res.json(fail('该队已进入赛程，不能修改组别或项目。如需调整，请先到「赛程编排」删除相关场次'));
+      }
+      // 同一组别+项目下本校只能有一支队
+      const dup = await queryOne(
+        'SELECT id FROM team_entry WHERE band_id = ? AND event_item_id = ? AND school_id = ? AND id <> ?',
+        [newBand, newItem, entry.school_id, req.params.id]
+      );
+      if (dup) return res.json(fail('该组别和项目下本校已有报名，不能重复'));
+    }
+
     await execute(
-      'UPDATE team_entry SET team_name=?, leader_name=?, coach_name=?, roster_json=? WHERE id=?',
-      [team_name, leader_name, coach_name, roster ? JSON.stringify(roster) : null, req.params.id]
+      'UPDATE team_entry SET band_id=?, event_item_id=?, team_name=?, leader_name=?, coach_name=?, roster_json=? WHERE id=?',
+      [newBand,
+       newItem,
+       team_name != null && team_name !== '' ? team_name : entry.team_name,
+       leader_name !== undefined ? leader_name : entry.leader_name,
+       coach_name !== undefined ? coach_name : entry.coach_name,
+       roster !== undefined ? (roster ? JSON.stringify(roster) : null) : entry.roster_json,
+       req.params.id]
+    );
+    res.json(ok(null, '已保存'));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 修改个人报名（组别 / 项目 / 运动员）
+ * 已进入赛次的报名不允许改动，避免赛次名单与报名对不上
+ */
+router.put('/athlete-entry/:id', async (req, res, next) => {
+  try {
+    const { band_id, event_item_id, athlete_id } = req.body;
+    const row = await queryOne(
+      `SELECT ae.*, a.school_id
+       FROM athlete_entry ae JOIN athlete a ON a.id = ae.athlete_id
+       WHERE ae.id = ?`, [req.params.id]);
+    if (!row) return res.json(fail('报名不存在'));
+    if (req.user.role === 2 && row.school_id !== req.user.school_id) {
+      return res.json(fail('无权修改其他学校的报名'));
+    }
+
+    const newBand = band_id != null && band_id !== '' ? Number(band_id) : row.band_id;
+    const newItem = event_item_id != null && event_item_id !== '' ? Number(event_item_id) : row.event_item_id;
+    const newAthlete = athlete_id != null && athlete_id !== '' ? Number(athlete_id) : row.athlete_id;
+    const changed = newBand !== row.band_id || newItem !== row.event_item_id || newAthlete !== row.athlete_id;
+
+    if (changed) {
+      const used = await queryOne(
+        'SELECT id FROM heat_entry WHERE athlete_id = ? AND event_item_id = ? AND competition_id = ? LIMIT 1',
+        [row.athlete_id, row.event_item_id, row.competition_id]
+      );
+      if (used) {
+        return res.json(fail('该报名已进入赛次，不能修改。如需调整，请先到「成绩录入」删除相关赛次'));
+      }
+      const dup = await queryOne(
+        'SELECT id FROM athlete_entry WHERE athlete_id = ? AND event_item_id = ? AND id <> ?',
+        [newAthlete, newItem, req.params.id]
+      );
+      if (dup) return res.json(fail('该运动员已经报过这个项目'));
+      // 学校端换人时只能选本校的运动员
+      if (req.user.role === 2 && newAthlete !== row.athlete_id) {
+        const a = await queryOne('SELECT school_id FROM athlete WHERE id = ?', [newAthlete]);
+        if (!a || a.school_id !== req.user.school_id) {
+          return res.json(fail('只能选择本校运动员'));
+        }
+      }
+    }
+
+    await execute(
+      'UPDATE athlete_entry SET band_id=?, event_item_id=?, athlete_id=? WHERE id=?',
+      [newBand, newItem, newAthlete, req.params.id]
     );
     res.json(ok(null, '已保存'));
   } catch (e) { next(e); }

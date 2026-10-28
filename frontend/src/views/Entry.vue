@@ -65,14 +65,12 @@
                 <t-tag :theme="statusType(row.status)" size="small" variant="light">{{ statusLabel(row.status) }}</t-tag>
               </template>
               <template #ops="{ row }">
+                <t-button variant="text" theme="primary" size="small" @click="openTeamEdit(row)">编辑</t-button>
                 <template v-if="store.isAdmin">
                   <t-button variant="text" theme="success" size="small" @click="auditTeam(row, 2)">通过</t-button>
                   <t-button variant="text" theme="danger" size="small" @click="auditTeam(row, 3)">驳回</t-button>
                 </template>
-                <template v-else>
-                  <t-button variant="text" theme="primary" size="small" @click="openTeamEdit(row)">编辑</t-button>
-                  <t-button variant="text" theme="danger" size="small" @click="removeTeam(row)">删除</t-button>
-                </template>
+                <t-button v-else variant="text" theme="danger" size="small" @click="removeTeam(row)">删除</t-button>
                 <t-button variant="text" size="small" @click="showRoster(row)">名单</t-button>
               </template>
             </t-table>
@@ -137,8 +135,11 @@
                 <t-tag :theme="statusType(row.status)" size="small" variant="light">{{ statusLabel(row.status) }}</t-tag>
               </template>
               <template #ops="{ row }">
-                <t-button variant="text" theme="success" size="small" @click="auditAthlete(row, 2)">通过</t-button>
-                <t-button variant="text" theme="danger" size="small" @click="auditAthlete(row, 3)">驳回</t-button>
+                <t-button variant="text" theme="primary" size="small" @click="openEntryEdit(row)">修改</t-button>
+                <template v-if="store.isAdmin">
+                  <t-button variant="text" theme="success" size="small" @click="auditAthlete(row, 2)">通过</t-button>
+                  <t-button variant="text" theme="danger" size="small" @click="auditAthlete(row, 3)">驳回</t-button>
+                </template>
               </template>
             </t-table>
           </div>
@@ -261,13 +262,19 @@
       :header="teamForm.id ? '编辑球队报名' : '新增球队报名'"
       :width="isMobile ? '94%' : '520px'" attach="body">
       <t-form :data="teamForm" label-width="88px" label-align="right">
+        <t-alert
+          v-if="teamForm.has_match"
+          theme="warning"
+          :message="'该队已进入赛程，组别与项目不可修改；如确需调整，请先到「赛程编排」删除相关场次'"
+          style="margin-bottom: 14px"
+        />
         <t-form-item label="组别" name="band_id" :rules="[{ required: true, message: '请选择组别' }]">
-          <t-select v-model="teamForm.band_id" style="width: 100%">
+          <t-select v-model="teamForm.band_id" :disabled="teamForm.has_match" style="width: 100%">
             <t-option v-for="b in bands" :key="b.id" :label="bandLabel(b)" :value="b.id" />
           </t-select>
         </t-form-item>
         <t-form-item label="项目" name="event_item_id" :rules="[{ required: true, message: '请选择项目' }]">
-          <t-select v-model="teamForm.event_item_id" style="width: 100%">
+          <t-select v-model="teamForm.event_item_id" :disabled="teamForm.has_match" style="width: 100%">
             <t-option
               v-for="e in events.filter((x) => x.category === 3)"
               :key="e.id"
@@ -436,16 +443,22 @@
     <!-- 个人报项表单 -->
     <t-dialog
       v-model:visible="entryDialog"
-      header="田径项目报项"
+      :header="entryForm.id ? '修改报名' : '田径项目报项'"
       :width="isMobile ? '94%' : '440px'" attach="body">
       <t-form :data="entryForm" label-width="88px" label-align="right">
+        <t-alert
+          v-if="entryForm.has_heat"
+          theme="warning"
+          :message="'该报名已进入赛次，组别、项目和运动员均不可修改；如确需调整，请先到「成绩录入」删除相关赛次'"
+          style="margin-bottom: 14px"
+        />
         <t-form-item label="组别" name="band_id" :rules="[{ required: true, message: '请选择组别' }]">
-          <t-select v-model="entryForm.band_id" style="width: 100%">
+          <t-select v-model="entryForm.band_id" :disabled="entryForm.has_heat" style="width: 100%">
             <t-option v-for="b in bands" :key="b.id" :label="bandLabel(b)" :value="b.id" />
           </t-select>
         </t-form-item>
         <t-form-item label="项目" name="event_item_id" :rules="[{ required: true, message: '请选择项目' }]">
-          <t-select v-model="entryForm.event_item_id" style="width: 100%">
+          <t-select v-model="entryForm.event_item_id" :disabled="entryForm.has_heat" style="width: 100%">
             <t-option
               v-for="e in events.filter((x) => x.category !== 3)"
               :key="e.id"
@@ -455,7 +468,13 @@
           </t-select>
         </t-form-item>
         <t-form-item label="运动员" name="athlete_id" :rules="[{ required: true, message: '请选择运动员' }]">
-          <t-select v-model="entryForm.athlete_id" filterable placeholder="选择本校运动员" style="width: 100%">
+          <t-select
+            v-model="entryForm.athlete_id"
+            filterable
+            :disabled="entryForm.has_heat"
+            placeholder="选择本校运动员"
+            style="width: 100%"
+          >
             <t-option
               v-for="a in roster"
               :key="a.id"
@@ -573,7 +592,7 @@ const teamColumns = computed(() => {
     { colKey: 'coach_name', title: '教练', width: 90 },
     { colKey: 'roster_count', title: '队员数', width: 80, align: 'center' },
     { colKey: 'status', title: '状态', width: 90, align: 'center' },
-    { colKey: 'ops', title: '操作', width: 190, align: 'center', fixed: 'right' }
+    { colKey: 'ops', title: '操作', width: 240, align: 'center', fixed: 'right' }
   );
   return cols;
 });
@@ -590,7 +609,7 @@ const athleteColumns = computed(() => {
     { colKey: 'bib_no', title: '号码', width: 80, align: 'center' },
     { colKey: 'status', title: '状态', width: 90, align: 'center' }
   ];
-  if (store.isAdmin) cols.push({ colKey: 'ops', title: '操作', width: 140, align: 'center', fixed: 'right' });
+  if (store.isAdmin) cols.push({ colKey: 'ops', title: '操作', width: 210, align: 'center', fixed: 'right' });
   return cols;
 });
 
@@ -626,7 +645,9 @@ const teamForm = reactive({
   team_name: '',
   leader_name: '',
   coach_name: '',
-  roster: []
+  roster: [],
+  // 已进入赛程的报名不能改组别/项目
+  has_match: false
 });
 
 const athleteForm = reactive({
@@ -922,9 +943,12 @@ function previewPhoto(row) {
 }
 
 const entryForm = reactive({
+  id: null,
   band_id: null,
   event_item_id: null,
-  athlete_id: null
+  athlete_id: null,
+  // 已进入赛次的报名不能改组别/项目/运动员
+  has_heat: false
 });
 
 // 学校角色只看本校进度
@@ -1221,6 +1245,7 @@ async function openTeamCreate() {
   teamForm.leader_name = '';
   teamForm.coach_name = '';
   teamForm.roster = [{ name: '', bib_no: '' }];
+  teamForm.has_match = false;
   teamDialog.value = true;
 }
 
@@ -1271,6 +1296,7 @@ async function openTeamEdit(row) {
   teamForm.team_name = row.team_name;
   teamForm.leader_name = row.leader_name || '';
   teamForm.coach_name = row.coach_name || '';
+  teamForm.has_match = !!row.has_match;
   // 兼容历史数据：老记录只有 { no, name }，号码从 no 里取
   teamForm.roster = parseRoster(row.roster_json).map((m) => ({
     name: m.name || '',
@@ -1508,9 +1534,20 @@ async function removeAthlete(row) {
 }
 
 function openAthleteEntry() {
+  entryForm.id = null;
   entryForm.band_id = bands.value.length ? bands.value[0].id : null;
   entryForm.event_item_id = null;
   entryForm.athlete_id = null;
+  entryForm.has_heat = false;
+  entryDialog.value = true;
+}
+
+function openEntryEdit(row) {
+  entryForm.id = row.id;
+  entryForm.band_id = row.band_id;
+  entryForm.event_item_id = row.event_item_id;
+  entryForm.athlete_id = row.athlete_id;
+  entryForm.has_heat = !!row.has_heat;
   entryDialog.value = true;
 }
 
@@ -1521,13 +1558,22 @@ async function submitEntry() {
   }
   saving.value = true;
   try {
-    await http.post('/entry/athlete', {
-      competition_id: store.competitionId,
-      band_id: entryForm.band_id,
-      athlete_id: entryForm.athlete_id,
-      event_item_id: entryForm.event_item_id
-    });
-    message.success('报项已提交');
+    if (entryForm.id) {
+      await http.put(`/entry/athlete-entry/${entryForm.id}`, {
+        band_id: entryForm.band_id,
+        athlete_id: entryForm.athlete_id,
+        event_item_id: entryForm.event_item_id
+      });
+      message.success('已保存');
+    } else {
+      await http.post('/entry/athlete', {
+        competition_id: store.competitionId,
+        band_id: entryForm.band_id,
+        athlete_id: entryForm.athlete_id,
+        event_item_id: entryForm.event_item_id
+      });
+      message.success('报项已提交');
+    }
     entryDialog.value = false;
     loadAthletes();
   } catch (e) {
