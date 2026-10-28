@@ -241,15 +241,19 @@ function buildOrderBookPdf({ book, data }) {
       case 'ATHLETE_LIST': {
         sectionTitle(doc, '运动员名单');
         const cols = [
-          { title: '序号', width: 38, align: 'center' },
-          { title: '姓名', width: 70 },
-          { title: '单位', width: 150 },
-          { title: '组别', width: 72 },
-          { title: '班级', width: 80 },
-          { title: '参赛项目', width: CONTENT_W - 38 - 70 - 150 - 72 - 80 }
+          { title: '序号', width: 34, align: 'center' },
+          { title: '号码', width: 52, align: 'center' },
+          { title: '姓名', width: 60 },
+          { title: '单位', width: 132 },
+          { title: '组别', width: 66 },
+          { title: '班级', width: 68 },
+          { title: '参赛项目', width: CONTENT_W - 34 - 52 - 60 - 132 - 66 - 68 }
         ];
         drawTable(doc, cols,
-          (data.athletes || []).map((a, i) => [i + 1, a.name, a.school_name, a.band_label || '', a.class_name || '', a.events || '']),
+          (data.athletes || []).map((a, i) => [
+            i + 1, a.bib_no ?? '', a.name, a.school_name,
+            a.band_label || '', a.class_name || '', a.events || ''
+          ]),
           { fontSize: 8.5, minRowH: 20 });
         doc.moveDown(0.8);
         break;
@@ -257,19 +261,27 @@ function buildOrderBookPdf({ book, data }) {
 
       case 'TIMETABLE': {
         sectionTitle(doc, '竞赛日程');
+        // 组别与项目拆成两列：title 形如「小学男子60米 决赛第1组」，直接放一列会粘在一起
         drawTable(doc, [
-          { title: '日期', width: 78 },
-          { title: '时段', width: 46, align: 'center' },
-          { title: '时间', width: 46, align: 'center' },
-          { title: '项目', width: CONTENT_W - 78 - 46 - 46 - 90 },
-          { title: '场地', width: 90 }
-        ], (data.timetable || []).map((t) => [
-          t.unit_date || '',
-          PERIOD[t.period] || '',
-          (t.start_time || '').slice(0, 5),
-          t.title || t.event_name || '',
-          t.venue_name || ''
-        ]), { fontSize: 8.5, minRowH: 20 });
+          { title: '日期', width: 74 },
+          { title: '时段', width: 42, align: 'center' },
+          { title: '时间', width: 42, align: 'center' },
+          { title: '组别', width: 70 },
+          { title: '项目', width: CONTENT_W - 74 - 42 - 42 - 70 - 84 },
+          { title: '场地', width: 84 }
+        ], (data.timetable || []).map((t) => {
+          const ttl = t.title || t.event_name || '';
+          const bl = t.band_label || '';
+          const ev = bl && ttl.startsWith(bl) ? ttl.slice(bl.length).trim() : ttl;
+          return [
+            t.unit_date || '',
+            PERIOD[t.period] || '',
+            (t.start_time || '').slice(0, 5),
+            bl,
+            ev,
+            t.venue_name || ''
+          ];
+        }), { fontSize: 8.5, minRowH: 20 });
         doc.moveDown(0.8);
         break;
       }
@@ -282,8 +294,8 @@ function buildOrderBookPdf({ book, data }) {
           doc.moveDown(1);
         }
         for (const h of heats) {
-          const head = `${h.band_label || ''}${h.event_name || ''} ${ROUND[h.round_code] || ''}`
-            + (h.heat_no ? ` 第${h.heat_no}组` : '');
+          const head = [h.band_label, h.event_name, ROUND[h.round_code] || '',
+            h.heat_no ? `第${h.heat_no}组` : ''].filter(Boolean).join(' ');
           ensure(doc, 70);
           subTitle(doc, head);
           drawTable(doc, [

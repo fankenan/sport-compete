@@ -85,6 +85,16 @@ async function autoArrange(competitionId, opts = {}) {
     'SELECT * FROM timetable_item WHERE competition_id = ?', [competitionId]
   );
 
+  // 没有任何赛次时给出明确原因（否则前端只会显示「已排入 0 条」，看着像没反应）
+  if (!heats.length) {
+    const totalHeat = await queryOne(
+      'SELECT COUNT(*) AS c FROM track_heat WHERE competition_id = ?', [competitionId]
+    );
+    if (!Number(totalHeat && totalHeat.c)) {
+      throw new Error('还没有可排的赛次。请先到「成绩录入 → 选项目 → 分组编排」生成预赛/决赛，再回来排日程');
+    }
+  }
+
   if (opts.clear) {
     await execute('DELETE FROM timetable_conflict WHERE competition_id = ?', [competitionId]);
     await execute('DELETE FROM timetable_item WHERE competition_id = ? AND locked_flag = 0', [competitionId]);

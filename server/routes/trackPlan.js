@@ -340,7 +340,7 @@ async function loadOrderBookData(cid) {
     );
 
     const athletes = await query(
-      `SELECT a.id, a.name, a.gender, a.class_name, s.name AS school_name,
+      `SELECT a.id, a.name, a.gender, a.class_name, a.bib_no, s.name AS school_name,
               gb.label AS band_label, GROUP_CONCAT(DISTINCT e.name ORDER BY e.sort_no SEPARATOR '、') AS events
          FROM athlete_entry ae
          JOIN athlete a ON a.id = ae.athlete_id
@@ -348,7 +348,7 @@ async function loadOrderBookData(cid) {
          JOIN event_item e ON e.id = ae.event_item_id
          JOIN group_band gb ON gb.id = ae.band_id
         WHERE ae.competition_id = ? AND ae.status = 2
-        GROUP BY a.id, a.name, a.gender, a.class_name, s.name, gb.label
+        GROUP BY a.id, a.name, a.gender, a.class_name, a.bib_no, s.name, gb.label
         ORDER BY s.name, gb.label, a.name`, [cid]
     );
 

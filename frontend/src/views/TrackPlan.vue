@@ -466,15 +466,24 @@ async function delUnit(id) {
 }
 
 async function autoArrange() {
-  const r = await http.post('/track-plan/arrange', { competition_id: compId.value, clear: true });
-  MessagePlugin.success(r?.message || '排布完成');
-  await loadTimetable();
+  try {
+    const r = await http.post('/track-plan/arrange', { competition_id: compId.value, clear: true });
+    MessagePlugin.success(r?.message || '排布完成');
+    await loadTimetable();
+  } catch (e) {
+    // 之前没有 catch，接口报错时页面完全没提示，看着像「点了没反应」
+    MessagePlugin.error(e.message || '自动排布失败');
+  }
 }
 
 async function detectConflicts() {
-  const r = await http.post('/track-plan/detect', { competition_id: compId.value });
-  MessagePlugin.success(r?.message || '检测完成');
-  await loadTimetable();
+  try {
+    const r = await http.post('/track-plan/detect', { competition_id: compId.value });
+    MessagePlugin.success(r?.message || '检测完成');
+    await loadTimetable();
+  } catch (e) {
+    MessagePlugin.error(e.message || '检测失败');
+  }
 }
 
 async function resolveConflict(id) {
