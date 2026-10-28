@@ -15,7 +15,8 @@ const GENDER_MAP = { 1: '男子', 2: '女子' };
  */
 export function bandSub(b) {
   if (!b) return '';
-  const raw = String(b.label || '').trim();
+  // 接口返回的字段名多为 band_label，这里要兼容
+  const raw = String(b.label || b.band_label || '').trim();
   if (!raw) return '';
 
   // 完整格式：高中男子 A组 → 取 A组
@@ -44,7 +45,8 @@ export function bandLabel(b) {
 
   const stage = STAGE_MAP[b.stage] || '';
   const gender = GENDER_MAP[b.gender] || '';
-  const raw = String(b.label || '').trim();
+  // 接口返回的字段名多为 band_label，这里要兼容
+  const raw = String(b.label || b.band_label || '').trim();
 
   // 已经是完整表述，原样用
   if (/^(小学|初中|高中)/.test(raw)) return raw;

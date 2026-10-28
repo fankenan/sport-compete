@@ -21,6 +21,18 @@
             <t-select v-model="filterEvent" placeholder="全部项目" clearable size="small" style="width: 140px" @change="loadTeams">
               <t-option v-for="e in events" :key="e.id" :label="e.name" :value="e.id" />
             </t-select>
+            <t-select
+              v-if="store.isAdmin"
+              v-model="filterSchool"
+              placeholder="全部学校"
+              clearable
+              filterable
+              size="small"
+              style="width: 180px"
+              @change="loadTeams"
+            >
+              <t-option v-for="s in schools" :key="s.id" :label="s.short_name || s.name" :value="s.id" />
+            </t-select>
             <t-select v-model="filterStatus" placeholder="全部状态" clearable size="small" style="width: 120px" @change="loadTeams">
               <t-option label="待审核" :value="1" />
               <t-option label="已通过" :value="2" />
@@ -75,6 +87,18 @@
             </t-select>
 <t-select v-model="filterEvent" placeholder="全部项目" clearable size="small" style="width: 140px" @change="loadAthletes">
           <t-option v-for="e in events" :key="e.id" :label="e.name" :value="e.id" />
+        </t-select>
+        <t-select
+          v-if="store.isAdmin"
+          v-model="filterSchool"
+          placeholder="全部学校"
+          clearable
+          filterable
+          size="small"
+          style="width: 180px"
+          @change="loadAthletes"
+        >
+          <t-option v-for="s in schools" :key="s.id" :label="s.short_name || s.name" :value="s.id" />
         </t-select>
         <t-select
           v-if="!store.isAdmin"
@@ -151,6 +175,7 @@
               :data="progressList"
               :columns="progressColumns"
               row-key="id"
+              table-layout="fixed"
               :loading="loadingProgress"
               :empty="'暂无数据'"
               hover
@@ -527,6 +552,7 @@ const printingAll = ref(false);
 const filterBand = ref(null);
 const filterEvent = ref(null);
 const filterStatus = ref(null);
+const filterSchool = ref(null);
 const selectedRows = ref([]);
 
 const teamDialog = ref(false);
@@ -569,13 +595,15 @@ const athleteColumns = computed(() => {
 });
 
 const progressColumns = [
-  { colKey: 'name', title: '学校', minWidth: 170, ellipsis: true },
-  { colKey: 'stage', title: '学段', width: 90, align: 'center' },
-  { colKey: 'short_name', title: '简称', width: 110 },
-  { colKey: 'team_count', title: '队伍数', width: 90, align: 'center' },
-  { colKey: 'athlete_count', title: '人数', width: 90, align: 'center' },
-  { colKey: 'pending_count', title: '待审核', width: 100, align: 'center' },
-  { colKey: 'signup', title: '报名状态', width: 120, align: 'center' }
+  // 所有列都给明确 width，配合 table-layout="fixed"，剩余空间按比例分给各列，
+  // 不会出现「学校列吃掉大半个表格」的情况
+  { colKey: 'name', title: '学校', width: 280, ellipsis: true },
+  { colKey: 'stage', title: '学段', width: 88, align: 'center' },
+  { colKey: 'short_name', title: '简称', width: 160, ellipsis: true },
+  { colKey: 'team_count', title: '队伍数', width: 88, align: 'center' },
+  { colKey: 'athlete_count', title: '人数', width: 88, align: 'center' },
+  { colKey: 'pending_count', title: '待审核', width: 88, align: 'center' },
+  { colKey: 'signup', title: '报名状态', width: 108, align: 'center' }
 ];
 
 const rosterColumns = [
@@ -970,6 +998,7 @@ async function loadCompetitions() {
 function onCompChange(id) {
   filterBand.value = null;
   filterEvent.value = null;
+  filterSchool.value = null;
   store.setCompetition(id);
 }
 
@@ -990,7 +1019,8 @@ async function loadTeams() {
         competition_id: store.competitionId,
         band_id: filterBand.value || undefined,
         event_item_id: filterEvent.value || undefined,
-        status: filterStatus.value || undefined
+        status: filterStatus.value || undefined,
+        school_id: filterSchool.value || undefined
       }
     });
   } catch (e) {
@@ -1008,7 +1038,8 @@ async function loadAthletes() {
       params: {
         competition_id: store.competitionId,
         band_id: filterBand.value || undefined,
-        event_item_id: filterEvent.value || undefined
+        event_item_id: filterEvent.value || undefined,
+        school_id: filterSchool.value || undefined
       }
     });
   } catch (e) {

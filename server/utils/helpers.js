@@ -70,7 +70,9 @@ function bandLabel(band) {
 
   const stage = { 1: '小学', 2: '初中', 3: '高中' }[band.stage] || '';
   const gender = { 1: '男子', 2: '女子' }[band.gender] || '';
-  const raw = String(band.label || '').trim();
+  // 路由里的查询普遍写 `gb.label AS band_label`，读数据时也要兼容这个别名，
+  // 否则 label 永远取不到、组别名只能靠 stage+gender 硬拼（曾导致初中组显示成“高中男子”）
+  const raw = String(band.label || band.band_label || '').trim();
 
   // 已经是完整表述
   if (/^(小学|初中|高中)/.test(raw)) return raw;

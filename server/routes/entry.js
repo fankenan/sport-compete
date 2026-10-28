@@ -92,13 +92,15 @@ router.get('/roster-pdf', async (req, res, next) => {
  */
 router.get('/list', async (req, res, next) => {
   try {
-    const { competition_id, band_id, event_item_id, status } = req.query;
-    const schoolId = scopeSchoolId(req);
+    const { competition_id, band_id, event_item_id, status, school_id } = req.query;
+    const scopeId = scopeSchoolId(req);
 
     const where = ['te.competition_id = ?'];
     const params = [competition_id];
 
-    if (schoolId) { where.push('te.school_id = ?'); params.push(schoolId); }
+    // 学校端强制只看本校（即使传了 school_id 也不生效）；管理员可按筛选的学校过滤
+    if (scopeId) { where.push('te.school_id = ?'); params.push(scopeId); }
+    else if (school_id) { where.push('te.school_id = ?'); params.push(school_id); }
     if (band_id) { where.push('te.band_id = ?'); params.push(band_id); }
     if (event_item_id) { where.push('te.event_item_id = ?'); params.push(event_item_id); }
     if (status) { where.push('te.status = ?'); params.push(status); }
@@ -124,12 +126,14 @@ router.get('/list', async (req, res, next) => {
  */
 router.get('/athlete-list', async (req, res, next) => {
   try {
-    const { competition_id, band_id, event_item_id } = req.query;
-    const schoolId = scopeSchoolId(req);
+    const { competition_id, band_id, event_item_id, school_id } = req.query;
+    const scopeId = scopeSchoolId(req);
 
     const where = ['ae.competition_id = ?'];
     const params = [competition_id];
-    if (schoolId) { where.push('a.school_id = ?'); params.push(schoolId); }
+    // 学校端强制只看本校；管理员可按筛选的学校过滤
+    if (scopeId) { where.push('a.school_id = ?'); params.push(scopeId); }
+    else if (school_id) { where.push('a.school_id = ?'); params.push(school_id); }
     if (band_id) { where.push('ae.band_id = ?'); params.push(band_id); }
     if (event_item_id) { where.push('ae.event_item_id = ?'); params.push(event_item_id); }
 
