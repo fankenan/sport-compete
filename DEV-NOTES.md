@@ -120,3 +120,53 @@ python deploy_fix_1027.py                          # 推内网机 + 腾讯云 + 
 - [ ] 移动端（手机）上的甘特图拖拽体验未实测，仅桌面端验证过
 - [ ] 服务器上的 dist 与 GitHub 源码尚未建立自动同步，改完代码要手动推一次
 - [ ] 报名、秩序册导出等模块的回归没有覆盖自动化测试，改动后建议手工过一遍
+
+---
+
+## 学校体育活动上报（2026-10-30 新增）
+
+模块路径 `/sport-activity`，菜单分组「体育活动」，角色 1（局端）与 2（学校端）可见，
+`SportActivityIndex.vue` 按角色分发到 `SportActivityAdmin`（看板）或 `SportActivity`（填报）。
+
+**数据表**：`school_sport_report`（唯一键 `school_id + term + phase`）、`school_sport_photo`
+建表脚本：`server/sql/sport_activity.sql`
+
+**五个板块**（六个上报项合并而来）：
+1. 阳光大课间（原「大课间开展情况」+「是否落实15分钟」，后者由时长自动判定）
+2. 每天体育活动时间（体育课折算 + 大课间折算 + 课后活动，自动判是否 ≥60 分钟）
+3. 校内竞赛（按学期统计）
+4. 武术进校园
+5. 体育作业
+
+**达标公式**（前后端必须一致：`sportActivity.js` 的 `calcMetrics` 与
+`SportActivity.vue` 的 `metrics`）：
+```
+recess_daily  = round(recess_minutes * min(recess_weekly,5) / 5)
+pe_daily      = round(pe_minutes * min(pe_weekly,5) / 5)
+daily_minutes = recess_daily + pe_daily + after_class_minutes
+recess_ok     = recess_enabled && recess_minutes >= 15
+daily_ok      = daily_minutes >= 60
+```
+达标状态**只在查询时算，不入库**。
+
+### 踩过的坑（重装环境务必照做）
+
+1. **systemd `ProtectHome=read-only` 会让上传目录变只读**，报错是
+   `EROFS: read-only file system, open '.../server/uploads/xxx.png'`。
+   服务器上已加：
+   ```
+   # /etc/systemd/system/sport-compete-backend.service
+   ProtectHome=read-only
+   ReadWritePaths=/home/single/sport-compete/server/uploads
+   ```
+   改完必须 `systemctl daemon-reload` 再 restart。**换机器部署要记得补这一行**。
+
+2. **新路由必须手动登记**到 `server/index.js`：普通文件名进 `routes` 数组，
+   驼峰命名进 `aliasRoutes`（如 `['/api/sport-activity','sportActivity']`）。
+   漏登记的表现是接口 404（`Cannot POST /api/upload/photo`）。
+
+3. 图片存 `server/uploads/`，由 `app.use('/uploads', express.static(...))` 提供，
+   返回给前端的是相对路径 `/uploads/xxx.png`，与前端同源无需额外配置。
+
+4. 图片随报表整体提交（`photos: { recess:[url...], ... }`），后端 `replacePhotos` 全量替换，
+   没有单独的上传绑定接口；被移除的图片会留在磁盘上成为孤儿文件，量大时需加清理任务。

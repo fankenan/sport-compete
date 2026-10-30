@@ -190,6 +190,9 @@ const ALL_MENU = [
   { path: '/entry', label: '报名管理', icon: 'edit', roles: [1, 2], mobile: true, section: '赛事组织' },
   { path: '/referee', label: '裁判管理', icon: 'user-circle', roles: [1], section: '赛事组织' },
 
+  // —— 体育活动（常态化工作，与具体赛事无关）——
+  { path: '/sport-activity', label: '学校体育活动', icon: 'heart', roles: [1, 2], mobile: true, section: '体育活动' },
+
   // —— 球类项目（循环赛 / 淘汰赛）——
   { path: '/grouping', label: '分组编排', icon: 'view-list', roles: [1], section: '球类项目' },
   { path: '/schedule', label: '赛程编排', icon: 'time', roles: [1], mobile: true, section: '球类项目' },
@@ -212,7 +215,7 @@ const ALL_MENU = [
   { path: '/my-schedule', label: '我的赛程', icon: 'star', roles: [3], mobile: true, section: '个人' }
 ];
 
-const SECTION_ORDER = ['总览', '赛事组织', '球类项目', '田径项目', '赛事发布', '个人'];
+const SECTION_ORDER = ['总览', '赛事组织', '体育活动', '球类项目', '田径项目', '赛事发布', '个人'];
 
 const visibleMenu = computed(() =>
   ALL_MENU.filter((i) => !i.roles || i.roles.includes(store.role))

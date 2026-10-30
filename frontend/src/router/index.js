@@ -40,6 +40,7 @@ const routes = [
       { path: 'grouping', name: 'grouping', component: () => import('../views/Grouping.vue'), meta: { title: '分组编排' } },
       { path: 'schedule', name: 'schedule', component: () => import('../views/Schedule.vue'), meta: { title: '赛程编排' } },
       { path: 'referee', name: 'referee', component: () => import('../views/Referee.vue'), meta: { title: '裁判管理' } },
+      { path: 'sport-activity', name: 'sport-activity', component: () => import('../views/SportActivityIndex.vue'), meta: { title: '学校体育活动' } },
       { path: 'standing', name: 'standing', component: () => import('../views/Standing.vue'), meta: { title: '积分榜' } },
       { path: 'rank', name: 'rank', component: () => import('../views/Rank.vue'), meta: { title: '名次表' } },
       { path: 'my-schedule', name: 'my-schedule', component: () => import('../views/MySchedule.vue'), meta: { title: '我的赛程' } }

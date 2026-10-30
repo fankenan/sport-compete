@@ -49,7 +49,8 @@ console.log('  路由挂载 /api/public（公开）');
 // 路由
 const routes = [
   'auth', 'school', 'competition', 'event', 'band', 'venue',
-  'entry', 'group', 'schedule', 'referee', 'result', 'rank', 'stats', 'track'
+  'entry', 'group', 'schedule', 'referee', 'result', 'rank', 'stats', 'track',
+  'upload'
 ];
 routes.forEach((r) => {
   const p = path.join(__dirname, 'routes', `${r}.js`);
@@ -65,7 +66,8 @@ const aliasRoutes = [
   ['/api/track-race', 'trackRace'],
   ['/api/track-stats', 'trackStats'],
   ['/api/screen-control', 'screenControl'],
-  ['/api/track-plan', 'trackPlan']
+  ['/api/track-plan', 'trackPlan'],
+  ['/api/sport-activity', 'sportActivity']
 ];
 aliasRoutes.forEach(([mount, file]) => {
   const p = path.join(__dirname, 'routes', `${file}.js`);
@@ -79,6 +81,11 @@ aliasRoutes.forEach(([mount, file]) => {
 app.get('/api/health', (req, res) => {
   res.json({ code: 0, message: 'ok', data: { time: new Date().toISOString() } });
 });
+
+// 上传的图片（体育活动上报等），由同源静态服务提供
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
 
 // 静态托管（前端构建产物，可选）
 const distDir = path.join(__dirname, '..', 'frontend', 'dist');
