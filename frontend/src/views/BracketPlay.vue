@@ -67,13 +67,39 @@
       </section>
 
       <!-- 淘汰赛 -->
-      <section v-if="koRounds.length" class="bp-section">
+      <section v-if="koRounds.length" ref="koRef" class="bp-section bp-ko" :class="{ 'is-full': isFull }">
         <div class="bp-sec-head">
           <span class="bp-sec-title">淘汰赛</span>
           <span class="bp-sec-tip">点卡片填比分，本轮全部完成后自动晋级下一轮</span>
+          <span class="bp-zoombar">
+            <button class="bp-zb" title="缩小（Ctrl + 滚轮）" @click="zoomBy(-1)">−</button>
+            <span class="bp-zv">{{ zoomPct }}%</span>
+            <button class="bp-zb" title="放大（Ctrl + 滚轮）" @click="zoomBy(1)">＋</button>
+            <button class="bp-zb wide" title="缩放到刚好铺满可视宽度" @click="fitZoom">适应</button>
+            <button class="bp-zb wide" title="恢复原始大小" @click="resetZoom">1:1</button>
+            <button class="bp-zb wide" :title="isFull ? '退出全屏（Esc）' : '全屏查看'" @click="toggleFull">
+              {{ isFull ? '退出全屏' : '全屏' }}
+            </button>
+          </span>
         </div>
-        <div class="bp-scroller">
-          <div class="bp-bracket" :style="{ width: lay.width + 'px', height: lay.height + 'px' }">
+        <div
+          ref="vpRef"
+          class="bp-viewport"
+          :class="{ panning }"
+          @wheel="onWheel"
+          @pointerdown="onPanStart"
+          @pointermove="onPanMove"
+          @pointerup="onPanEnd"
+          @pointercancel="onPanEnd"
+        >
+          <div class="bp-zoom" :style="{ width: lay.width * zoom + 'px', height: lay.height * zoom + 'px' }">
+          <div
+            class="bp-bracket"
+            :style="{
+              width: lay.width + 'px', height: lay.height + 'px',
+              transform: `scale(${zoom})`
+            }"
+          >
             <div
               v-for="(r, i) in koRounds" :key="'h' + i"
               class="bp-rh" :style="{ left: i * COL_STEP + 'px' }"
@@ -103,11 +129,13 @@
             </div>
             <div v-if="champion" class="bp-cup" :style="{ left: lay.champX + 'px', top: lay.champY + 'px' }">冠军</div>
           </div>
+          </div>
         </div>
       </section>
     </template>
 
-    <!-- 录分弹窗 -->
+    <!-- 录分弹窗（全屏时挂到全屏容器内，否则原生全屏下会被挡在外层不可见） -->
+    <Teleport :to="dialogTarget">
     <div v-if="editing" class="bp-mask" @click.self="closeScore">
       <div class="bp-dialog">
         <div class="bp-dlg-head">
@@ -140,11 +168,12 @@
         </div>
       </div>
     </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { MessagePlugin } from 'tdesign-vue-next';
 import http from '../api/http';
 import { useUserStore } from '../store/user';
@@ -173,6 +202,140 @@ const abandonA = ref(false);
 const abandonB = ref(false);
 const remark = ref('');
 const saving = ref(false);
+
+/* ---------------- 缩放 / 全屏 ---------------- */
+const koRef = ref(null);
+const vpRef = ref(null);
+const zoom = ref(1);
+const isFull = ref(false);
+const pseudoFull = ref(false);   // 浏览器不支持原生全屏时的兜底
+const panning = ref(false);
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 2.5;
+const ZOOM_STEP = 0.15;
+
+const zoomPct = computed(() => Math.round(zoom.value * 100));
+// 原生全屏时只有全屏元素内部的节点会显示，弹窗必须挂进去
+const dialogTarget = computed(() => (isFull.value && koRef.value ? koRef.value : 'body'));
+
+/** 以某个锚点（视口内的相对位置）为中心缩放，缩放后该点保持在原处 */
+function applyZoom(next, anchor) {
+  const vp = vpRef.value;
+  const z0 = zoom.value;
+  const z1 = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(next * 100) / 100));
+  if (z1 === z0) return;
+
+  let cx = vp ? vp.clientWidth / 2 : 0;
+  let cy = vp ? vp.clientHeight / 2 : 0;
+  if (anchor && vp) {
+    const r = vp.getBoundingClientRect();
+    cx = anchor.x - r.left;
+    cy = anchor.y - r.top;
+  }
+  const px = vp ? (vp.scrollLeft + cx) / z0 : 0;
+  const py = vp ? (vp.scrollTop + cy) / z0 : 0;
+
+  zoom.value = z1;
+  nextTick(() => {
+    const v = vpRef.value;
+    if (!v) return;
+    v.scrollLeft = px * z1 - cx;
+    v.scrollTop = py * z1 - cy;
+  });
+}
+
+function zoomBy(dir) {
+  applyZoom(zoom.value + dir * ZOOM_STEP);
+}
+
+function resetZoom() {
+  applyZoom(1);
+  nextTick(() => {
+    if (vpRef.value) { vpRef.value.scrollLeft = 0; vpRef.value.scrollTop = 0; }
+  });
+}
+
+function fitZoom() {
+  const vp = vpRef.value;
+  if (!vp || !lay.value.width) return;
+  const w = vp.clientWidth - 24;
+  applyZoom(Math.max(MIN_ZOOM, Math.min(1, w / lay.value.width)));
+  nextTick(() => {
+    if (vpRef.value) { vpRef.value.scrollLeft = 0; vpRef.value.scrollTop = 0; }
+  });
+}
+
+function onWheel(e) {
+  if (!e.ctrlKey && !e.metaKey) return;   // 普通滚轮保持滚动
+  e.preventDefault();
+  applyZoom(zoom.value + (e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP), { x: e.clientX, y: e.clientY });
+}
+
+/* 空白处按住拖动平移 */
+let drag = null;
+function onPanStart(e) {
+  if (e.button !== 0) return;
+  if (e.target.closest('.bp-m')) return;   // 卡片留给点击录分
+  const vp = vpRef.value;
+  if (!vp) return;
+  drag = { x: e.clientX, y: e.clientY, l: vp.scrollLeft, t: vp.scrollTop };
+  panning.value = true;
+  try { vp.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+}
+function onPanMove(e) {
+  if (!drag) return;
+  const vp = vpRef.value;
+  if (!vp) return;
+  vp.scrollLeft = drag.l - (e.clientX - drag.x);
+  vp.scrollTop = drag.t - (e.clientY - drag.y);
+}
+function onPanEnd() {
+  drag = null;
+  panning.value = false;
+}
+
+const canNativeFull = () =>
+  typeof document !== 'undefined' &&
+  !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+
+async function toggleFull() {
+  const el = koRef.value;
+  if (!el) return;
+  if (!isFull.value) {
+    if (canNativeFull()) {
+      try {
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        await req.call(el);
+      } catch (err) {
+        pseudoFull.value = true;
+        isFull.value = true;
+      }
+    } else {
+      pseudoFull.value = true;
+      isFull.value = true;
+    }
+  } else {
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch (err) { /* ignore */ }
+    }
+    pseudoFull.value = false;
+    isFull.value = false;
+  }
+  nextTick(() => { if (isFull.value) fitZoom(); });
+}
+
+function onFsChange() {
+  const native = !!document.fullscreenElement && document.fullscreenElement === koRef.value;
+  isFull.value = native || pseudoFull.value;
+  if (isFull.value) nextTick(fitZoom);
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' && pseudoFull.value) {
+    pseudoFull.value = false;
+    isFull.value = false;
+  }
+}
 
 const bandTabs = computed(() => {
   const m = new Map();
@@ -365,7 +528,24 @@ watch(bandKey, () => {
   if (eventTabs.value.length) eventKey.value = eventTabs.value[0].key;
 });
 
-onMounted(() => load());
+// 切组别/项目后对阵尺寸变了，全屏状态下重新铺满
+watch([bandKey, eventKey], () => {
+  if (isFull.value) nextTick(fitZoom);
+});
+
+onMounted(() => {
+  load();
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  window.addEventListener('keydown', onKeyDown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', onFsChange);
+  document.removeEventListener('webkitfullscreenchange', onFsChange);
+  window.removeEventListener('keydown', onKeyDown);
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); }
+});
 </script>
 
 <style scoped>
@@ -455,10 +635,45 @@ onMounted(() => load());
 .bp-mrow.done .bp-sc { color: var(--tx); border-style: solid; border-color: rgba(140,170,255,.3); }
 .bp-meta { font-size: 10.5px; color: #5d6b88; text-align: right; }
 
-.bp-scroller { overflow-x: auto; padding-bottom: 14px; }
-.bp-scroller::-webkit-scrollbar { height: 8px; }
-.bp-scroller::-webkit-scrollbar-thumb { background: rgba(140,170,255,.25); border-radius: 4px; }
-.bp-bracket { position: relative; }
+/* ---------- 淘汰赛视口：缩放 / 平移 / 全屏 ---------- */
+.bp-ko .bp-sec-head { align-items: center; flex-wrap: wrap; row-gap: 8px; }
+.bp-zoombar { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.bp-zb {
+  appearance: none; border: 1px solid var(--cb); background: rgba(255,255,255,.04);
+  color: var(--dm); font: inherit; font-size: 12px; line-height: 1;
+  min-width: 26px; height: 26px; padding: 0 8px; border-radius: 7px;
+  cursor: pointer; transition: .18s;
+}
+.bp-zb.wide { padding: 0 11px; }
+.bp-zb:hover { color: #fff; border-color: rgba(46,230,214,.5); background: rgba(46,230,214,.12); }
+.bp-zv {
+  min-width: 46px; text-align: center; font-size: 12px; color: #a9b8d8;
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-viewport {
+  position: relative; overflow: auto; max-height: 64vh;
+  padding: 4px 0 14px; cursor: grab; touch-action: pan-x pan-y;
+}
+.bp-viewport.panning { cursor: grabbing; user-select: none; }
+.bp-viewport::-webkit-scrollbar { width: 8px; height: 8px; }
+.bp-viewport::-webkit-scrollbar-thumb { background: rgba(140,170,255,.25); border-radius: 4px; }
+.bp-viewport::-webkit-scrollbar-corner { background: transparent; }
+.bp-zoom { position: relative; }
+.bp-bracket { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+/* 全屏（原生全屏与兜底模式共用同一套布局） */
+.bp-ko.is-full {
+  position: fixed; inset: 0; z-index: 900; margin: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  padding: 16px 24px 18px; border-radius: 0;
+  background:
+    radial-gradient(900px 620px at 10% -12%, rgba(46,230,214,.15), transparent 62%),
+    radial-gradient(820px 600px at 92% -6%, rgba(155,92,255,.18), transparent 62%),
+    #05070e;
+}
+.bp-ko.is-full .bp-sec-head { flex: 0 0 auto; }
+.bp-ko.is-full .bp-viewport { flex: 1 1 auto; max-height: none; min-height: 0; }
 .bp-rh { position: absolute; top: 0; display: flex; flex-direction: column; }
 .bp-rh b { font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #a9b8d8; }
 .bp-rh b::after { content: ""; display: block; width: 36px; height: 1px; margin-top: 6px; background: linear-gradient(90deg, rgba(46,230,214,.7), transparent); }
@@ -518,7 +733,7 @@ onMounted(() => load());
 .bp-empty { text-align: center; color: var(--dm); font-size: 14px; line-height: 2; padding: 70px 20px; }
 
 .bp-mask {
-  position: fixed; inset: 0; z-index: 50; background: rgba(2,4,10,.72);
+  position: fixed; inset: 0; z-index: 1000; background: rgba(2,4,10,.72);
   display: flex; align-items: center; justify-content: center; padding: 20px;
   backdrop-filter: blur(3px);
 }
