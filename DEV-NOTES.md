@@ -170,3 +170,52 @@ daily_ok      = daily_minutes >= 60
 
 4. 图片随报表整体提交（`photos: { recess:[url...], ... }`），后端 `replacePhotos` 全量替换，
    没有单独的上传绑定接口；被移除的图片会留在磁盘上成为孤儿文件，量大时需加清理任务。
+
+---
+
+## 迁移到腾讯云（2026-11-02）
+
+内网机 10.128.1.45 失联后，后端整体迁到腾讯云 150.158.39.237。
+
+### 现状
+| 项 | 位置 |
+|---|---|
+| 后端代码 | `/opt/sport-compete/server`（node，端口 4100） |
+| 前端 dist | `/var/www/sport-compete`（nginx 8083 / 443） |
+| 数据库 | 本机 MariaDB 10.11，库名 `sport_compete`（61 张表） |
+| 上传图片 | `/opt/sport-compete/server/uploads` |
+| systemd | `sport-compete-backend`（已 enable 开机自启） |
+| 日志 | `/var/log/sport-compete.log`、`-error.log` |
+
+### nginx 关键改动
+`sites-available/compete-http`（8083）和 `sites-available/sport-compete`（443）里的
+`location /api/` 原来 `proxy_pass http://127.0.0.1:8443`（SSH 隧道回内网机），
+**已改成 `http://127.0.0.1:4100`**（本机后端）。
+备份在 `/root/compete-http.bak.MMDD`、`/root/sport-compete.bak.MMDD`。
+
+### 数据库账号
+复用本机 `sport_manage` 的 root 凭据（见 `/root/server/.env` 的 `DB_PASSWORD`）。
+本项目自己的配置在 `/opt/sport-compete/server/.env`。
+
+### 表结构是怎么建的
+`sql/schema.sql` 只是早期版本（21 表），完整结构要按顺序再跑：
+`sql/migrate_*.sql`（10 个）→ `server/sql/sport_activity.sql`，
+用 `mysql -f` 容错执行（重复列会报错但不影响），最终 61 张表。
+
+### 数据迁移（未完成，等内网机）
+库内目前只有 `sql/seed.sql` 的示例数据（16 学校 / 8 账号 / 1 赛事 / 24 条报名）。
+**真实数据仍在失联的内网机上**，恢复后按下面步骤搬：
+```bash
+# 内网机
+mysqldump -u$DB_USER -p$DB_PASSWORD --single-transaction --skip-lock-tables \
+  $DB_NAME > /tmp/sc_full.sql
+tar czf /tmp/sc_uploads.tgz -C /home/single/sport-compete/server uploads
+# 拉到腾讯云后
+mysql -uroot -p<PW> -e "DROP DATABASE sport_compete; CREATE DATABASE sport_compete CHARACTER SET utf8mb4;"
+mysql -uroot -p<PW> sport_compete < sc_full.sql
+tar xzf sc_uploads.tgz -C /opt/sport-compete/server/
+```
+导入前记得清掉 seed 的示例数据（DROP 重建即可）。
+
+### 账号
+管理员 `admin` / `体卫艺科`（迁移后按用户习惯改的，seed 原密码是 admin123）。

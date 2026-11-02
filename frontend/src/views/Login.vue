@@ -103,7 +103,7 @@
             <div class="demo-grid">
               <div class="demo-item" @click="fillDemo('admin')">
                 <span class="di-role">教育局</span>
-                <span class="di-acc">admin / admin123</span>
+                <span class="di-acc">admin / 体卫艺科</span>
               </div>
               <div class="demo-item" @click="fillDemo('school')">
                 <span class="di-role">学校端</span>
@@ -155,7 +155,7 @@ const rules = {
 };
 
 const DEMO = {
-  admin: { username: 'admin', password: 'admin123' },
+  admin: { username: 'admin', password: '体卫艺科' },
   school: { username: 'school1', password: 'school123' },
   referee: { username: 'ref001', password: 'ref123' }
 };
