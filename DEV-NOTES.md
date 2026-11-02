@@ -219,3 +219,59 @@ tar xzf sc_uploads.tgz -C /opt/sport-compete/server/
 
 ### 账号
 管理员 `admin` / `体卫艺科`（迁移后按用户习惯改的，seed 原密码是 admin123）。
+
+---
+
+## 球类编排：按赛制分项目（2026-11-02）
+
+原设计四个球类项目共用一套「分组循环 → 淘汰」，参赛方一律是球队。
+乒乓球/羽毛球是个人项目（单打/双打/混双），赛制也不同，因此做了扩展。
+
+### 两个新维度（event_item 上）
+
+| 字段 | 取值 | 含义 |
+|---|---|---|
+| `schedule_mode` | `GROUP_KO`（默认） | 分组循环 → 淘汰 |
+| | `KO` | 纯淘汰，不分小组，报名通过后直接出对阵树 |
+| `participant_kind` | `TEAM`（默认） | 学校组队 |
+| | `ATHLETE` | 个人单打 |
+| | `PAIR` | 双打/混双组合 |
+
+### 关键设计：不新建 contestant 表
+
+「个人」「双打组合」也写一条 `team_entry`，用 `entry_kind` 区分（1球队 2个人 3双打）。
+好处是 `match_info.team_a_id/team_b_id` 不用动，**对阵图、录分、自动晋级、积分榜、
+秩序册、大屏对阵全部零改动复用**。双打搭档存在 `partner_name` / `partner_athlete_id`。
+
+### 纯淘汰算法（server/services/schedule-ko.js）
+
+```
+size = 2^ceil(log2 n)      目标位次
+byes = size - n            轮空数
+种子位表 seedSlots(size)，把 1..n 号种子放进去，空位即轮空
+```
+实测：18 人 → 2 场预赛 + 14 轮空（= 16 强）；14 人 → 6 场 + 2 轮空；8 人 → 直接八进四。
+与用户那张手工乒乓球对阵图规则一致。
+
+- 轮次用 `match_info.round_no` 表示（1,2,3…），`stage` 固定 2；三四名 stage=6
+- **全轮次预生成**（空位待填），轮空者在生成时直接落位到下一轮
+- 晋级：按「下一轮空位顺序」填胜者，而不是固定 i/2 配对
+  （第 1 轮有轮空时真实比赛不在连续位置，用 i/2 会填错位）
+- `advanceKo` 幂等：每次录分调用都从头走一遍，能连续推进多轮
+
+### 踩过的坑
+
+1. **`team_entry` 原唯一索引 `uk_band_event_school` 挡死个人赛**——一校一人。
+   已删除，改由 `entry.js` 按 `entry_kind` 校验（球队赛仍一校一队）。
+2. **迁移丢字段**：`event_item.home_away / allow_draw / win_points / draw_points`
+   是当年在内网机上手工 ALTER 的，没进版本库，迁腾讯云时丢了 →
+   `event-config` 接口直接 500，且主客场开关**静默失效**。已补建并写进
+   `sql/migrate_schedule_mode.sql` 同类问题的教训：**任何 ALTER 都要落脚本**。
+3. **晋级初版只从第 1 轮判起**，导致第 2 轮之后永远推不动。改成幂等遍历。
+4. 占位场次（双方还待定）必须拒绝录分，否则会出现 null vs null 有比分的脏数据。
+
+### 接口
+
+- `GET  /api/schedule/ko-preview?competition_id&event_item_id` 剩余人数→轮次/场次/轮空
+- `POST /api/schedule/generate-ko` 生成对阵树
+- `GET  /api/schedule/bracket-all` KO 模式下按 round_no 分轮，轮次名动态生成
