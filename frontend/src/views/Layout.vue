@@ -196,6 +196,7 @@ const ALL_MENU = [
   // —— 球类项目（循环赛 / 淘汰赛）——
   { path: '/grouping', label: '分组编排', icon: 'view-list', roles: [1], section: '球类项目' },
   { path: '/schedule', label: '赛程编排', icon: 'time', roles: [1], mobile: true, section: '球类项目' },
+  { path: '/bracket-play', label: '对阵与比分', icon: 'chart-bubble', roles: [1, 3], mobile: true, section: '球类项目' },
   // 积分榜 / 名次表 对裁判(3)与学校(2)同样开放：现场查分、赛后核对都需要，
   // 且移动端底部导航早就给了裁判这两个入口，桌面端原先缺，属权限标注遗漏。
   { path: '/standing', label: '积分榜', icon: 'chart-line', roles: [1, 2, 3], mobile: true, section: '球类项目' },

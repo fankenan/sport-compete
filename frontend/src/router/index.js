@@ -45,6 +45,7 @@ const routes = [
       { path: 'entry', name: 'entry', component: () => import('../views/Entry.vue'), meta: { title: '报名管理' } },
       { path: 'grouping', name: 'grouping', component: () => import('../views/Grouping.vue'), meta: { title: '分组编排' } },
       { path: 'schedule', name: 'schedule', component: () => import('../views/Schedule.vue'), meta: { title: '赛程编排' } },
+      { path: 'bracket-play', name: 'bracket-play', component: () => import('../views/BracketPlay.vue'), meta: { title: '对阵与比分' } },
       { path: 'referee', name: 'referee', component: () => import('../views/Referee.vue'), meta: { title: '裁判管理' } },
       { path: 'sport-activity', name: 'sport-activity', component: () => import('../views/SportActivityIndex.vue'), meta: { title: '学校体育活动' } },
       { path: 'standing', name: 'standing', component: () => import('../views/Standing.vue'), meta: { title: '积分榜' } },
