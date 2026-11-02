@@ -22,6 +22,12 @@ const routes = [
     meta: { public: true, title: '公开成绩查询' }
   },
   {
+    path: '/bracket-show',
+    name: 'bracket-show',
+    component: () => import('../views/BracketShow.vue'),
+    meta: { title: '对阵大屏' }
+  },
+  {
     path: '/',
     component: () => import('../views/Layout.vue'),
     redirect: '/dashboard',

@@ -30,6 +30,7 @@
         <t-button variant="outline" @click="doCleanEmpty">清理空槽</t-button>
         <t-button variant="outline" @click="loadGantt">刷新</t-button>
         <t-button variant="outline" @click="openBracket">对阵图</t-button>
+        <t-button variant="outline" @click="openBracketShow">大屏对阵</t-button>
 
         <span class="tb-divider"></span>
 
@@ -1114,6 +1115,17 @@ function openBracket() {
   bkEventId.value = filterEvent.value || null;
   bkVisible.value = true;
   if (bkBandId.value && bkEventId.value) loadBracket();
+}
+
+/** 深色大屏对阵图：新开标签页，方便投到第二块屏或现场大屏 */
+function openBracketShow() {
+  const cid = store.competitionId;
+  if (!cid) {
+    message.warning('请先选择赛事');
+    return;
+  }
+  const base = `${location.origin}${location.pathname}`;
+  window.open(`${base}#/bracket-show?competition_id=${cid}`, '_blank');
 }
 
 async function loadBracket() {

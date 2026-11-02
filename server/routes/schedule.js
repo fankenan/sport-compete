@@ -298,77 +298,118 @@ router.get('/list', async (req, res, next) => {
  * 返回按轮次分列的场次树（八进四 → 半决赛 → 决赛/三四名），前端画 NBA 式对阵图。
  * 晋级连线由前端按「上一列两场 → 下一列一场」的树形规则推导。
  */
+/** 构建单个「项目 × 组别」的淘汰赛对阵，供 /bracket 与 /bracket-all 共用 */
+async function buildBracket(competitionId, eventItemId, bandId) {
+  const rows = await query(
+    `SELECT m.id, m.stage, m.seq_no, m.score_a, m.score_b, m.status,
+            m.team_a_id, m.team_b_id,
+            ta.team_name AS team_a_name, sa.name AS school_a,
+            tb.team_name AS team_b_name, sb.name AS school_b,
+            ss.play_date, TIME_FORMAT(ss.start_time,'%H:%i') AS start_time,
+            v.name AS venue_name
+     FROM match_info m
+     LEFT JOIN team_entry ta ON ta.id = m.team_a_id
+     LEFT JOIN team_entry tb ON tb.id = m.team_b_id
+     LEFT JOIN school sa ON sa.id = ta.school_id
+     LEFT JOIN school sb ON sb.id = tb.school_id
+     LEFT JOIN schedule_slot ss ON ss.id = m.slot_id
+     LEFT JOIN venue v ON v.id = ss.venue_id
+     WHERE m.competition_id = ? AND m.event_item_id = ? AND m.band_id = ?
+       AND m.stage IN (2,3,5,6)
+     ORDER BY m.stage, m.seq_no`,
+    [competitionId, eventItemId, bandId]
+  );
+
+  const nameOf = (m, side) => {
+    const t = side === 'a' ? m.team_a_name : m.team_b_name;
+    const s = side === 'a' ? m.school_a : m.school_b;
+    return t || s || '待定';
+  };
+
+  const decorate = (m) => ({
+    id: m.id,
+    stage: m.stage,
+    seq_no: m.seq_no,
+    team_a: nameOf(m, 'a'),
+    team_b: nameOf(m, 'b'),
+    team_a_id: m.team_a_id,
+    team_b_id: m.team_b_id,
+    score_a: m.score_a,
+    score_b: m.score_b,
+    status: m.status,
+    winner_id:
+      m.status === 1 && m.score_a != null && m.score_b != null && m.score_a !== m.score_b
+        ? (m.score_a > m.score_b ? m.team_a_id : m.team_b_id)
+        : null,
+    play_date: m.play_date,
+    start_time: m.start_time,
+    venue: m.venue_name || ''
+  });
+
+  const byStage = new Map();
+  for (const m of rows) {
+    if (!byStage.has(m.stage)) byStage.set(m.stage, []);
+    byStage.get(m.stage).push(decorate(m));
+  }
+
+  const rounds = [];
+  if (byStage.has(2)) rounds.push({ stage: 2, label: '八进四', matches: byStage.get(2) });
+  if (byStage.has(3)) rounds.push({ stage: 3, label: '半决赛', matches: byStage.get(3) });
+  if (byStage.has(6)) rounds.push({ stage: 6, label: '三四名', matches: byStage.get(6), side: 'bottom' });
+  if (byStage.has(5)) rounds.push({ stage: 5, label: '决赛', matches: byStage.get(5) });
+
+  let champion = null;
+  const finalM = byStage.get(5)?.[0];
+  if (finalM && finalM.winner_id) {
+    champion = finalM.winner_id === finalM.team_a_id ? finalM.team_a : finalM.team_b;
+  }
+
+  return { rounds, champion };
+}
+
 router.get('/bracket', async (req, res, next) => {
   try {
     const { competition_id, event_item_id, band_id } = req.query;
     if (!competition_id || !event_item_id || !band_id) return res.json(fail('缺少参数'));
+    res.json(ok(await buildBracket(competition_id, event_item_id, band_id)));
+  } catch (e) { next(e); }
+});
 
-    const rows = await query(
-      `SELECT m.id, m.stage, m.seq_no, m.score_a, m.score_b, m.status,
-              m.team_a_id, m.team_b_id,
-              ta.team_name AS team_a_name, sa.name AS school_a,
-              tb.team_name AS team_b_name, sb.name AS school_b,
-              ss.play_date, TIME_FORMAT(ss.start_time,'%H:%i') AS start_time,
-              v.name AS venue_name
+/**
+ * GET /api/schedule/bracket-all?competition_id=
+ * 一次返回该赛事所有有淘汰赛的「项目 × 组别」，供深色大屏对阵图切换
+ */
+router.get('/bracket-all', async (req, res, next) => {
+  try {
+    const { competition_id } = req.query;
+    if (!competition_id) return res.json(fail('缺少赛事'));
+
+    const combos = await query(
+      `SELECT DISTINCT m.event_item_id, m.band_id,
+              ei.name AS event_name, ei.category, ei.sort_no AS event_sort,
+              gb.label AS band_label, gb.stage, gb.gender, gb.sort_no AS band_sort
        FROM match_info m
-       LEFT JOIN team_entry ta ON ta.id = m.team_a_id
-       LEFT JOIN team_entry tb ON tb.id = m.team_b_id
-       LEFT JOIN school sa ON sa.id = ta.school_id
-       LEFT JOIN school sb ON sb.id = tb.school_id
-       LEFT JOIN schedule_slot ss ON ss.id = m.slot_id
-       LEFT JOIN venue v ON v.id = ss.venue_id
-       WHERE m.competition_id = ? AND m.event_item_id = ? AND m.band_id = ?
-         AND m.stage IN (2,3,5,6)
-       ORDER BY m.stage, m.seq_no`,
-      [competition_id, event_item_id, band_id]
-    );
+       JOIN event_item ei ON ei.id = m.event_item_id
+       JOIN group_band gb ON gb.id = m.band_id
+       WHERE m.competition_id = ? AND m.stage IN (2,3,5,6)
+       ORDER BY gb.stage, gb.gender, ei.sort_no`, [competition_id]);
 
-    const nameOf = (m, side) => {
-      const t = side === 'a' ? m.team_a_name : m.team_b_name;
-      const s = side === 'a' ? m.school_a : m.school_b;
-      return t || s || '待定';
-    };
-
-    const decorate = (m) => ({
-      id: m.id,
-      stage: m.stage,
-      seq_no: m.seq_no,
-      team_a: nameOf(m, 'a'),
-      team_b: nameOf(m, 'b'),
-      team_a_id: m.team_a_id,
-      team_b_id: m.team_b_id,
-      score_a: m.score_a,
-      score_b: m.score_b,
-      status: m.status,
-      winner_id:
-        m.status === 1 && m.score_a != null && m.score_b != null && m.score_a !== m.score_b
-          ? (m.score_a > m.score_b ? m.team_a_id : m.team_b_id)
-          : null,
-      play_date: m.play_date,
-      start_time: m.start_time,
-      venue: m.venue_name || ''
-    });
-
-    const byStage = new Map();
-    for (const m of rows) {
-      if (!byStage.has(m.stage)) byStage.set(m.stage, []);
-      byStage.get(m.stage).push(decorate(m));
+    const out = [];
+    for (const c of combos) {
+      const b = await buildBracket(competition_id, c.event_item_id, c.band_id);
+      if (!b.rounds.length) continue;
+      out.push({
+        event_item_id: c.event_item_id,
+        band_id: c.band_id,
+        event_name: c.event_name,
+        band_label: c.band_label || '',
+        stage: c.stage,
+        rounds: b.rounds,
+        champion: b.champion,
+        match_count: b.rounds.reduce((s, r) => s + r.matches.length, 0)
+      });
     }
-
-    const rounds = [];
-    if (byStage.has(2)) rounds.push({ stage: 2, label: '八进四', matches: byStage.get(2) });
-    if (byStage.has(3)) rounds.push({ stage: 3, label: '半决赛', matches: byStage.get(3) });
-    if (byStage.has(6)) rounds.push({ stage: 6, label: '三四名', matches: byStage.get(6), side: 'bottom' });
-    if (byStage.has(5)) rounds.push({ stage: 5, label: '决赛', matches: byStage.get(5) });
-
-    // 冠军：决赛已录分时的胜者
-    let champion = null;
-    const finalM = byStage.get(5)?.[0];
-    if (finalM && finalM.winner_id) {
-      champion = finalM.winner_id === finalM.team_a_id ? finalM.team_a : finalM.team_b;
-    }
-
-    res.json(ok({ rounds, champion }));
+    res.json(ok(out));
   } catch (e) { next(e); }
 });
 
