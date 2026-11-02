@@ -3,6 +3,7 @@ const { query, queryOne, execute, ok, fail } = require('../db');
 const { authRequired, roleRequired } = require('../middleware/auth');
 const { bandLabel, addMinutes } = require('../utils/helpers');
 const scheduler = require('../services/scheduler');
+const ko = require('../services/schedule-ko');
 const { bergerByes } = require('../services/schedule-algorithms');
 
 const router = express.Router();
@@ -298,10 +299,22 @@ router.get('/list', async (req, res, next) => {
  * 返回按轮次分列的场次树（八进四 → 半决赛 → 决赛/三四名），前端画 NBA 式对阵图。
  * 晋级连线由前端按「上一列两场 → 下一列一场」的树形规则推导。
  */
+/** 纯淘汰模式的轮次名：决赛 / 半决赛 / 8强 / 16强 / 预赛 */
+function koRoundLabel(r, totalRounds, matchCount) {
+  if (r === totalRounds) return '决赛';
+  if (r === totalRounds - 1) return '半决赛';
+  const full = 2 ** (totalRounds - r);   // 该轮满额场次（无轮空时）
+  if (matchCount < full) return '预赛';   // 该轮只有部分人参赛
+  return `${matchCount * 2}强`;
+}
+
 /** 构建单个「项目 × 组别」的淘汰赛对阵，供 /bracket 与 /bracket-all 共用 */
 async function buildBracket(competitionId, eventItemId, bandId) {
+  const ev = await queryOne('SELECT schedule_mode FROM event_item WHERE id = ?', [eventItemId]);
+  const isKo = (ev?.schedule_mode || 'GROUP_KO') === 'KO';
+
   const rows = await query(
-    `SELECT m.id, m.stage, m.seq_no, m.score_a, m.score_b, m.status,
+    `SELECT m.id, m.stage, m.round_no, m.seq_no, m.score_a, m.score_b, m.status,
             m.team_a_id, m.team_b_id,
             ta.team_name AS team_a_name, sa.name AS school_a,
             tb.team_name AS team_b_name, sb.name AS school_b,
@@ -315,8 +328,8 @@ async function buildBracket(competitionId, eventItemId, bandId) {
      LEFT JOIN schedule_slot ss ON ss.id = m.slot_id
      LEFT JOIN venue v ON v.id = ss.venue_id
      WHERE m.competition_id = ? AND m.event_item_id = ? AND m.band_id = ?
-       AND m.stage IN (2,3,5,6)
-     ORDER BY m.stage, m.seq_no`,
+       AND m.stage IN (${isKo ? '2,6' : '2,3,5,6'})
+     ORDER BY ${isKo ? 'm.round_no, m.seq_no' : 'm.stage, m.seq_no'}`,
     [competitionId, eventItemId, bandId]
   );
 
@@ -329,6 +342,7 @@ async function buildBracket(competitionId, eventItemId, bandId) {
   const decorate = (m) => ({
     id: m.id,
     stage: m.stage,
+    round_no: m.round_no,
     seq_no: m.seq_no,
     team_a: nameOf(m, 'a'),
     team_b: nameOf(m, 'b'),
@@ -337,6 +351,7 @@ async function buildBracket(competitionId, eventItemId, bandId) {
     score_a: m.score_a,
     score_b: m.score_b,
     status: m.status,
+    has_both: !!(m.team_a_id && m.team_b_id),
     winner_id:
       m.status === 1 && m.score_a != null && m.score_b != null && m.score_a !== m.score_b
         ? (m.score_a > m.score_b ? m.team_a_id : m.team_b_id)
@@ -353,18 +368,47 @@ async function buildBracket(competitionId, eventItemId, bandId) {
   }
 
   const rounds = [];
-  if (byStage.has(2)) rounds.push({ stage: 2, label: '八进四', matches: byStage.get(2) });
-  if (byStage.has(3)) rounds.push({ stage: 3, label: '半决赛', matches: byStage.get(3) });
-  if (byStage.has(6)) rounds.push({ stage: 6, label: '三四名', matches: byStage.get(6), side: 'bottom' });
-  if (byStage.has(5)) rounds.push({ stage: 5, label: '决赛', matches: byStage.get(5) });
-
   let champion = null;
-  const finalM = byStage.get(5)?.[0];
-  if (finalM && finalM.winner_id) {
-    champion = finalM.winner_id === finalM.team_a_id ? finalM.team_a : finalM.team_b;
+
+  if (isKo) {
+    // 纯淘汰：按 round_no 分轮，轮次名按剩余人数动态生成
+    const koList = byStage.get(2) || [];
+    const totalRounds = koList.reduce((mx, m) => Math.max(mx, m.round_no || 1), 0);
+    for (let r = 1; r <= totalRounds; r++) {
+      const list = koList.filter((m) => (m.round_no || 1) === r);
+      if (!list.length) continue;
+      rounds.push({
+        stage: 2,
+        round_no: r,
+        label: koRoundLabel(r, totalRounds, list.length),
+        matches: list
+      });
+    }
+    const third = byStage.get(6) || [];
+    if (third.length) {
+      // 三四名插在决赛前一列
+      rounds.splice(Math.max(0, rounds.length - 1), 0, {
+        stage: 6, label: '三四名', matches: third, side: 'bottom'
+      });
+    }
+    const finalRound = [...rounds].reverse().find((x) => x.stage === 2);
+    const finalM = finalRound?.matches?.[0];
+    if (finalM && finalM.winner_id) {
+      champion = finalM.winner_id === finalM.team_a_id ? finalM.team_a : finalM.team_b;
+    }
+  } else {
+    if (byStage.has(2)) rounds.push({ stage: 2, label: '八进四', matches: byStage.get(2) });
+    if (byStage.has(3)) rounds.push({ stage: 3, label: '半决赛', matches: byStage.get(3) });
+    if (byStage.has(6)) rounds.push({ stage: 6, label: '三四名', matches: byStage.get(6), side: 'bottom' });
+    if (byStage.has(5)) rounds.push({ stage: 5, label: '决赛', matches: byStage.get(5) });
+
+    const finalM = byStage.get(5)?.[0];
+    if (finalM && finalM.winner_id) {
+      champion = finalM.winner_id === finalM.team_a_id ? finalM.team_a : finalM.team_b;
+    }
   }
 
-  return { rounds, champion };
+  return { rounds, champion, is_ko: isKo };
 }
 
 router.get('/bracket', async (req, res, next) => {
@@ -1035,6 +1079,56 @@ router.post('/league-auto', roleRequired(1), async (req, res, next) => {
       weekday: wd,
       warnings: warnings.slice(0, 20)
     }, `已排 ${placed} 场，共 ${lastRound} 轮，${first} 至 ${addDays(first, (lastRound - 1) * 7)}`));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 纯淘汰（KO）预览：各组别会有几轮、几场、几个轮空
+ * GET /api/schedule/ko-preview?competition_id=&event_item_id=
+ */
+router.get('/ko-preview', async (req, res, next) => {
+  try {
+    const { competition_id, event_item_id } = req.query;
+    if (!competition_id || !event_item_id) return res.json(fail('缺少参数'));
+
+    const rows = await query(
+      `SELECT te.band_id, gb.label AS band_label, gb.sort_no, COUNT(*) AS cnt
+         FROM team_entry te
+         JOIN group_band gb ON gb.id = te.band_id
+        WHERE te.competition_id = ? AND te.event_item_id = ? AND te.status = 2
+        GROUP BY te.band_id, gb.label, gb.sort_no
+        ORDER BY gb.sort_no`,
+      [competition_id, event_item_id]
+    );
+
+    const bands = rows.map((r) => ({
+      band_id: r.band_id,
+      band_label: bandLabel({ label: r.band_label, stage: 0, gender: 0 }) || r.band_label,
+      ...ko.previewKo(r.cnt)
+    }));
+    res.json(ok({ bands }));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 纯淘汰（KO）：直接生成对阵树，不走分组
+ * POST /api/schedule/generate-ko { competition_id, event_item_id, band_id? }
+ */
+router.post('/generate-ko', roleRequired(1), async (req, res, next) => {
+  try {
+    const { competition_id, event_item_id, band_id } = req.body;
+    if (!competition_id || !event_item_id) return res.json(fail('缺少参数'));
+
+    const ev = await queryOne('SELECT name FROM event_item WHERE id = ?', [event_item_id]);
+    if (!ev) return res.json(fail('项目不存在'));
+
+    const r = await ko.generateKo(competition_id, event_item_id, { band_id });
+    const parts = r.bands.map((b) => (
+      b.created
+        ? `${b.teams} 人 → ${b.rounds} 轮 ${b.created} 场（${b.byes} 个轮空）`
+        : `跳过（${b.note || '人数不足'}）`
+    ));
+    res.json(ok(r, `已生成 ${r.total} 场对阵：${parts.join('；')}`));
   } catch (e) { next(e); }
 });
 

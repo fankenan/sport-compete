@@ -18,7 +18,8 @@
         </t-select>
 
         <template v-if="arrangeMode === 'auto'">
-          <t-button theme="primary" @click="openSlots">生成时间槽</t-button>
+          <t-button v-if="isKoMode" theme="primary" @click="doGenerateKo">生成对阵</t-button>
+          <t-button theme="primary" variant="outline" @click="openSlots">生成时间槽</t-button>
           <t-button variant="outline" @click="doPack">自动装箱</t-button>
           <t-button v-if="homeAway" theme="success" variant="outline" @click="openLeague">联赛排期</t-button>
         </template>
@@ -48,6 +49,14 @@
       <p class="mode-hint">
         <template v-if="arrangeMode === 'auto'">
           先「生成时间槽」规划每天有哪些时段可用，再「自动装箱」把比赛按规则铺进去；铺完可以点格子微调。
+        </template>
+        <template v-if="isKoMode">
+          <span class="ha-on">
+            本项目为「纯淘汰」：
+            <template v-if="koInfo && koInfo.teams">{{ koInfo.teams }} 人 → {{ koInfo.rounds }} 轮 {{ koInfo.totalMatches }} 场<template v-if="koInfo.byes">，{{ koInfo.byes }} 人轮空直进下一轮</template>。</template>
+            <template v-else>暂无审核通过的参赛者。</template>
+            点「生成对阵」直接出对阵树，不用分组。
+          </span>
         </template>
         <template v-else>
           「新增场次」逐场指定日期、时间（精确到分钟）、场地和对阵双方；不需要先生成时间槽。
@@ -510,10 +519,46 @@ const homeAway = ref(false);
 const savingHomeAway = ref(false);
 const estimate = ref(null);
 
+/** 当前项目是否为纯淘汰赛制（乒乓球/羽毛球单打这类） */
+const isKoMode = computed(() => {
+  const ev = events.value.find((e) => Number(e.id) === Number(filterEvent.value));
+  return ev?.schedule_mode === 'KO';
+});
+const koInfo = ref(null);   // 纯淘汰预览：几个人、几轮、几场、几个轮空
+
+async function loadKoPreview() {
+  koInfo.value = null;
+  if (!filterEvent.value || !isKoMode.value) return;
+  try {
+    const r = await http.get('/schedule/ko-preview', {
+      params: { competition_id: store.competitionId, event_item_id: filterEvent.value }
+    });
+    koInfo.value = r?.bands?.[0] || null;
+  } catch (e) { /* 忽略 */ }
+}
+
+async function doGenerateKo() {
+  if (!filterEvent.value) return message.warning('请先在上方选择一个项目');
+  if (!koInfo.value || !koInfo.value.teams) {
+    return message.warning('该项目还没有审核通过的参赛者，请先到「报名管理」审核通过后再生成对阵');
+  }
+  try {
+    const r = await http.post('/schedule/generate-ko', {
+      competition_id: store.competitionId,
+      event_item_id: filterEvent.value
+    });
+    message.success(r?.message || '对阵已生成');
+    loadGantt();
+  } catch (e) {
+    message.error(e.message);
+  }
+}
+
 /** 顶部筛选变化：重画甘特图，并按新项目重读主客场设置与规模预估 */
 function onFilterChange() {
   loadGantt();
   loadHomeAway();
+  loadKoPreview();
 }
 
 async function loadHomeAway() {

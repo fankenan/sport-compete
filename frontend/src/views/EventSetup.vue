@@ -164,6 +164,25 @@
         </t-form-item>
 
         <template v-if="itemForm.category === 3">
+          <t-form-item label="赛制">
+            <t-radio-group v-model="itemForm.schedule_mode" variant="default-filled">
+              <t-radio-button value="GROUP_KO">分组循环 + 淘汰</t-radio-button>
+              <t-radio-button value="KO">纯淘汰</t-radio-button>
+            </t-radio-group>
+          </t-form-item>
+          <t-form-item label="参赛单位">
+            <t-radio-group v-model="itemForm.participant_kind" variant="default-filled">
+              <t-radio-button value="TEAM">学校组队</t-radio-button>
+              <t-radio-button value="ATHLETE">个人单打</t-radio-button>
+              <t-radio-button value="PAIR">双打/混双</t-radio-button>
+            </t-radio-group>
+          </t-form-item>
+          <t-form-item v-if="itemForm.schedule_mode === 'KO'" label="提示">
+            <span class="dim" style="line-height:1.7">
+              纯淘汰不分小组，报名审核通过后直接生成对阵树，<br />
+              人数不是 2 的幂时自动安排轮空（如 18 人 → 2 场预赛 + 14 人轮空进 16 强）
+            </span>
+          </t-form-item>
           <t-form-item label="单场时长">
             <t-input-number v-model="itemForm.match_minutes" :min="1" :max="120" :step="1" />
             <span class="unit">分钟</span>
@@ -472,6 +491,8 @@ const itemForm = reactive({
   advance_count: 4,
   pairing_rule: 1,
   has_third_place: 1,
+  schedule_mode: 'GROUP_KO',
+  participant_kind: 'TEAM',
       lane_count: 8,
   prelim_max: 16,
   // 田径参数
@@ -585,6 +606,8 @@ function openItemCreate() {
   itemForm.advance_count = 4;
   itemForm.pairing_rule = 1;
   itemForm.has_third_place = 1;
+  itemForm.schedule_mode = 'GROUP_KO';
+  itemForm.participant_kind = 'TEAM';
   itemForm.lane_count = 8;
   itemForm.prelim_max = 16;
   resetTrackFields();
@@ -699,6 +722,8 @@ function openItemEdit(row) {
   itemForm.advance_count = row.advance_count ?? 4;
   itemForm.pairing_rule = row.pairing_rule ?? 1;
   itemForm.has_third_place = row.has_third_place ?? 1;
+  itemForm.schedule_mode = row.schedule_mode || 'GROUP_KO';
+  itemForm.participant_kind = row.participant_kind || 'TEAM';
   itemForm.lane_count = row.lane_count ?? 8;
   itemForm.prelim_max = row.prelim_max ?? 16;
   // 田径参数
@@ -738,6 +763,8 @@ async function submitItem() {
       advance_count: itemForm.advance_count,
       pairing_rule: itemForm.pairing_rule,
       has_third_place: itemForm.has_third_place,
+      schedule_mode: itemForm.schedule_mode || 'GROUP_KO',
+      participant_kind: itemForm.participant_kind || 'TEAM',
       lane_count: itemForm.lane_count,
       prelim_max: itemForm.prelim_max
     };

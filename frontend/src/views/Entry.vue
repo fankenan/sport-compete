@@ -305,6 +305,8 @@
             />
           </t-select>
         </t-form-item>
+        <!-- 球队赛：队名 + 领队 + 教练 + 队员名单 -->
+        <template v-if="curPKind === 'TEAM'">
         <t-form-item label="队名" name="team_name" :rules="[{ required: true, message: '请填写队名' }]">
           <t-input v-model="teamForm.team_name" placeholder="如 少先队代表队" :maxlength="64" />
         </t-form-item>
@@ -352,6 +354,53 @@
             </div>
           </div>
         </t-form-item>
+        </template>
+
+        <!-- 个人单打 / 双打：直接选运动员，不用填队名 -->
+        <template v-else>
+          <t-form-item :label="curPKind === 'PAIR' ? '运动员一' : '运动员'">
+            <t-select
+              v-model="teamForm.memberId"
+              filterable
+              clearable
+              placeholder="从名册中选择运动员"
+              style="width: 100%"
+              @change="onPickMemberSingle"
+            >
+              <t-option
+                v-for="a in allRoster"
+                :key="a.id"
+                :label="`${a.name}${a.class_name ? ' · ' + a.class_name : ''}`"
+                :value="a.id"
+              />
+            </t-select>
+          </t-form-item>
+          <t-form-item v-if="curPKind === 'PAIR'" label="运动员二">
+            <t-select
+              v-model="teamForm.partnerId"
+              filterable
+              clearable
+              placeholder="搭档"
+              style="width: 100%"
+              @change="onPickPartner"
+            >
+              <t-option
+                v-for="a in allRoster.filter((x) => Number(x.id) !== Number(teamForm.memberId))"
+                :key="a.id"
+                :label="`${a.name}${a.class_name ? ' · ' + a.class_name : ''}`"
+                :value="a.id"
+              />
+            </t-select>
+          </t-form-item>
+          <t-form-item label="参赛名">
+            <span class="dim">
+              {{ curPKind === 'PAIR'
+                ? `${teamForm.team_name || '—'} / ${teamForm.partnerName || '—'}`
+                : (teamForm.team_name || '—') }}
+            </span>
+          </t-form-item>
+          <p v-if="!allRoster.length" class="roster-tip">名册为空，请先到「名册管理」添加运动员</p>
+        </template>
       </t-form>
       <template #footer>
         <t-button @click="teamDialog = false">取消</t-button>
@@ -673,9 +722,29 @@ const teamForm = reactive({
   leader_name: '',
   coach_name: '',
   roster: [],
+  // 个人赛 / 双打：直接选运动员
+  memberId: null,
+  partnerId: null,
+  partnerName: '',
   // 已进入赛程的报名不能改组别/项目
   has_match: false
 });
+
+/** 当前所选项目要求什么参赛单位：TEAM 球队 / ATHLETE 个人 / PAIR 双打 */
+const curPKind = computed(() => {
+  const ev = events.value.find((e) => Number(e.id) === Number(teamForm.event_item_id));
+  return ev?.participant_kind || 'TEAM';
+});
+
+function onPickMemberSingle(v) {
+  const a = allRoster.value.find((x) => Number(x.id) === Number(v));
+  if (a) teamForm.team_name = a.name;
+}
+
+function onPickPartner(v) {
+  const a = allRoster.value.find((x) => Number(x.id) === Number(v));
+  if (a) teamForm.partnerName = a.name;
+}
 
 const athleteForm = reactive({
   id: null,
@@ -1284,6 +1353,9 @@ async function openTeamCreate() {
   teamForm.coach_name = '';
   teamForm.roster = [{ name: '', bib_no: '' }];
   teamForm.has_match = false;
+  teamForm.memberId = null;
+  teamForm.partnerId = null;
+  teamForm.partnerName = '';
   teamDialog.value = true;
 }
 
@@ -1335,6 +1407,19 @@ async function openTeamEdit(row) {
   teamForm.leader_name = row.leader_name || '';
   teamForm.coach_name = row.coach_name || '';
   teamForm.has_match = !!row.has_match;
+  // 个人/双打报名：按名字反查名册，回填运动员下拉
+  teamForm.memberId = null;
+  teamForm.partnerId = null;
+  teamForm.partnerName = row.partner_name || '';
+  if (Number(row.entry_kind || 1) > 1) {
+    const list = parseRoster(row.roster_json);
+    const hitA = allRoster.value.find((x) => x.name === (list[0]?.name || row.team_name));
+    if (hitA) teamForm.memberId = hitA.id;
+    if (row.partner_name) {
+      const hitB = allRoster.value.find((x) => x.name === row.partner_name);
+      if (hitB) teamForm.partnerId = hitB.id;
+    }
+  }
   // 兼容历史数据：老记录只有 { no, name }，号码从 no 里取
   teamForm.roster = parseRoster(row.roster_json).map((m) => ({
     name: m.name || '',
@@ -1348,6 +1433,55 @@ async function submitTeam() {
     message.warning('请选择组别和项目');
     return;
   }
+
+  // ---------- 个人单打 / 双打：只选运动员 ----------
+  if (curPKind.value !== 'TEAM') {
+    if (!teamForm.memberId) return message.warning('请选择运动员');
+    const a = allRoster.value.find((x) => Number(x.id) === Number(teamForm.memberId));
+    if (!a) return message.warning('所选运动员不在名册中，请刷新后重试');
+
+    let b = null;
+    if (curPKind.value === 'PAIR') {
+      if (!teamForm.partnerId) return message.warning('双打项目请选择搭档');
+      if (Number(teamForm.partnerId) === Number(teamForm.memberId)) {
+        return message.warning('搭档不能和运动员是同一人');
+      }
+      b = allRoster.value.find((x) => Number(x.id) === Number(teamForm.partnerId));
+    }
+
+    saving.value = true;
+    try {
+      const payload = {
+        competition_id: store.competitionId,
+        band_id: teamForm.band_id,
+        event_item_id: teamForm.event_item_id,
+        team_name: a.name,
+        partner_name: b ? b.name : null,
+        partner_athlete_id: b ? b.id : null,
+        school_id: a.school_id,
+        roster: [
+          { name: a.name, athlete_id: a.id },
+          ...(b ? [{ name: b.name, athlete_id: b.id }] : [])
+        ]
+      };
+      if (teamForm.id) {
+        const r = await http.put(`/entry/team/${teamForm.id}`, payload);
+        message.success(r?.needAudit ? '已保存，需重新审核' : '已保存');
+      } else {
+        await http.post('/entry/team', payload);
+        message.success('报名已提交，等待审核');
+      }
+      teamDialog.value = false;
+      loadTeams();
+      loadProgress();
+    } catch (e) {
+      message.error(e.message);
+    } finally {
+      saving.value = false;
+    }
+    return;
+  }
+
   if (!teamForm.team_name.trim()) {
     message.warning('请填写队名');
     return;

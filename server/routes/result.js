@@ -68,6 +68,11 @@ router.post('/score', async (req, res, next) => {
     const m = await queryOne('SELECT * FROM match_info WHERE id = ?', [match_id]);
     if (!m) return res.json(fail('场次不存在'));
 
+    // 淘汰赛预生成的占位场次，双方还没确定时不能录分
+    if (!m.team_a_id || !m.team_b_id) {
+      return res.json(fail('该场对阵双方尚未确定（需等上一轮赛果），暂时不能录分'));
+    }
+
     // 裁判只能录指派给自己的场次
     if (req.user.role === 3) {
       const assigned = await queryOne(

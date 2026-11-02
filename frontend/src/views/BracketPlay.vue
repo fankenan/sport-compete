@@ -112,7 +112,12 @@
             <div
               v-for="c in lay.cards" :key="'c' + c.id"
               class="bp-m"
-              :class="{ pre: c.round === 0, done: c.status === 1, winnable: c.status !== 1 }"
+              :class="{
+                pre: c.round === 0,
+                done: c.status === 1,
+                winnable: c.status !== 1 && c.has_both !== false,
+                pending: c.has_both === false
+              }"
               :style="{ left: c.x + 'px', top: c.y + 'px' }"
               @click="openScore(c)"
             >
@@ -452,8 +457,9 @@ function isLose(m, side) {
 }
 
 function openScore(m) {
-  if (!m.team_a_name && !m.team_b_name) {
-    MessagePlugin.warning('双方还没确定，暂时不能录分');
+  // 纯淘汰预生成的占位场次：双方还是「待定」，等上一轮赛果
+  if (m.has_both === false || (!m.team_a_name && !m.team_b_name)) {
+    MessagePlugin.warning('对阵双方尚未确定，等上一轮赛果出来后再录分');
     return;
   }
   editing.value = m;
@@ -691,6 +697,8 @@ onBeforeUnmount(() => {
   border-color: rgba(46,230,214,.7);
   box-shadow: 0 14px 30px -14px rgba(46,230,214,.65);
 }
+/* 双方待定：还没轮到录分 */
+.bp-m.pending { cursor: not-allowed; opacity: .5; background: rgba(255,255,255,.025); }
 .bp-m.pre { border-color: rgba(255,197,49,.3); background: rgba(255,197,49,.05); }
 .bp-no {
   width: 34px; flex: 0 0 34px; display: flex; align-items: center; justify-content: center;

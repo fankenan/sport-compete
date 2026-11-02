@@ -375,6 +375,11 @@ function findSlot(slotMap, used, occupiedHalf, preferHalf, venueCursor) {
 async function tryAdvanceStage(competitionId, bandId, eventItemId) {
   const event = await queryOne('SELECT * FROM event_item WHERE id = ?', [eventItemId]);
 
+  // 纯淘汰（乒乓球/羽毛球）：轮次结构不定，走独立推进逻辑
+  if ((event?.schedule_mode || 'GROUP_KO') === 'KO') {
+    return require('./schedule-ko').advanceKo(competitionId, bandId, eventItemId);
+  }
+
   // 当前阶段
   const stages = await query(
     `SELECT stage, COUNT(*) AS cnt, SUM(status = 1) AS done_cnt

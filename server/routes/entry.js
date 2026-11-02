@@ -107,7 +107,7 @@ router.get('/list', async (req, res, next) => {
 
     const rows = await query(
       `SELECT te.*, s.name AS school_name, gb.stage, gb.gender, gb.label AS band_label,
-              ei.name AS event_name, ei.category,
+              ei.name AS event_name, ei.category, ei.participant_kind,
               EXISTS(SELECT 1 FROM match_info mi WHERE mi.team_a_id = te.id OR mi.team_b_id = te.id) AS has_match
        FROM team_entry te
        JOIN school s ON s.id = te.school_id
@@ -229,6 +229,8 @@ router.post('/athlete-audit-batch', roleRequired(1), async (req, res, next) => {
 router.post('/team', async (req, res, next) => {
   try {
     const { competition_id, band_id, event_item_id, team_name, leader_name, coach_name, roster } = req.body;
+    const partner_name = req.body.partner_name || null;
+    const partner_athlete_id = req.body.partner_athlete_id || null;
     if (!competition_id || !band_id || !event_item_id || !team_name) {
       return res.json(fail('请填写完整'));
     }
@@ -237,12 +239,29 @@ router.post('/team', async (req, res, next) => {
     const schoolId = req.user.role === 2 ? req.user.school_id : (req.body.school_id || 0);
     if (!schoolId) return res.json(fail('请选择学校'));
 
-    // 同组别同项目同校唯一
-    const dup = await queryOne(
-      'SELECT id FROM team_entry WHERE band_id=? AND event_item_id=? AND school_id=?',
-      [band_id, event_item_id, schoolId]
-    );
-    if (dup) return res.json(fail('本校在该组别该项目已报名，请勿重复提交'));
+    // 按项目类型决定参赛单位：球队 / 个人单打 / 双打组合
+    const ev = await queryOne('SELECT participant_kind FROM event_item WHERE id = ?', [event_item_id]);
+    const pkind = ev?.participant_kind || 'TEAM';
+    const entryKind = pkind === 'PAIR' ? 3 : (pkind === 'ATHLETE' ? 2 : 1);
+
+    if (entryKind === 1) {
+      // 球队赛：同组别同项目同校只能一支队
+      const dup = await queryOne(
+        'SELECT id FROM team_entry WHERE band_id=? AND event_item_id=? AND school_id=? AND entry_kind=1',
+        [band_id, event_item_id, schoolId]
+      );
+      if (dup) return res.json(fail('本校在该组别该项目已报名，请勿重复提交'));
+    } else {
+      // 个人/双打：同校可多人报名，只挡「同一人重复报同一项目」
+      const dup = await queryOne(
+        'SELECT id FROM team_entry WHERE band_id=? AND event_item_id=? AND school_id=? AND team_name=?',
+        [band_id, event_item_id, schoolId, team_name]
+      );
+      if (dup) return res.json(fail('该运动员已报名此项目，请勿重复提交'));
+      if (entryKind === 3 && !partner_name) {
+        return res.json(fail('双打项目请填写搭档姓名'));
+      }
+    }
 
     // 组别校验：学校学段与组别学段必须一致
     const band = await queryOne('SELECT * FROM group_band WHERE id = ?', [band_id]);
@@ -251,14 +270,19 @@ router.post('/team', async (req, res, next) => {
       return res.json(fail(`组别学段不匹配：${school.name} 属于${['小学','初中','高中'][school.stage - 1]}`));
     }
 
+    const displayName = entryKind === 3 ? `${team_name}/${partner_name}` : team_name;
+
     const r = await execute(
-      `INSERT INTO team_entry (competition_id, band_id, event_item_id, school_id, team_name, leader_name, coach_name, roster_json)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [competition_id, band_id, event_item_id, schoolId, team_name,
+      `INSERT INTO team_entry
+         (competition_id, band_id, event_item_id, school_id, team_name, leader_name, coach_name,
+          roster_json, entry_kind, partner_name, partner_athlete_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [competition_id, band_id, event_item_id, schoolId, displayName,
        leader_name || null, coach_name || null,
-       roster ? JSON.stringify(roster) : null]
+       roster ? JSON.stringify(roster) : null,
+       entryKind, partner_name, partner_athlete_id]
     );
-    res.json(ok({ id: r.insertId }, '报名已提交，等待审核'));
+    res.json(ok({ id: r.insertId, entry_kind: entryKind }, '报名已提交，等待审核'));
   } catch (e) { next(e); }
 });
 
@@ -288,12 +312,14 @@ router.put('/team/:id', async (req, res, next) => {
       if (used) {
         return res.json(fail('该队已进入赛程，不能修改组别或项目。如需调整，请先到「赛程编排」删除相关场次'));
       }
-      // 同一组别+项目下本校只能有一支队
-      const dup = await queryOne(
-        'SELECT id FROM team_entry WHERE band_id = ? AND event_item_id = ? AND school_id = ? AND id <> ?',
-        [newBand, newItem, entry.school_id, req.params.id]
-      );
-      if (dup) return res.json(fail('该组别和项目下本校已有报名，不能重复'));
+      // 球队赛：同一组别+项目下本校只能有一支队（个人/双打不限制）
+      if (Number(entry.entry_kind || 1) === 1) {
+        const dup = await queryOne(
+          'SELECT id FROM team_entry WHERE band_id = ? AND event_item_id = ? AND school_id = ? AND id <> ? AND entry_kind = 1',
+          [newBand, newItem, entry.school_id, req.params.id]
+        );
+        if (dup) return res.json(fail('该组别和项目下本校已有报名，不能重复'));
+      }
     }
 
     await execute(

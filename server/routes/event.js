@@ -38,10 +38,12 @@ router.post('/items', roleRequired(1), async (req, res, next) => {
 
     const cols = ['competition_id', 'name', 'category', 'is_relay', 'match_minutes', 'slot_interval',
       'group_count', 'rounds_per_group', 'advance_count', 'pairing_rule', 'has_third_place',
+      'schedule_mode', 'participant_kind',
       'lane_count', 'prelim_max'];
     const vals = [b.competition_id, b.name, b.category, b.is_relay || 0, b.match_minutes || 24,
       b.slot_interval || 45, b.group_count || 0, b.rounds_per_group || 0,
       b.advance_count || 4, b.pairing_rule || 1, b.has_third_place ?? 1,
+      b.schedule_mode || 'GROUP_KO', b.participant_kind || 'TEAM',
       b.lane_count || 8, b.prelim_max || 16];
 
     for (const f of TRACK_FIELDS) {
@@ -74,6 +76,8 @@ router.put('/items/:id', roleRequired(1), async (req, res, next) => {
       advance_count: b.advance_count ?? ev.advance_count,
       pairing_rule: b.pairing_rule ?? ev.pairing_rule,
       has_third_place: b.has_third_place ?? ev.has_third_place,
+      schedule_mode: b.schedule_mode ?? ev.schedule_mode,
+      participant_kind: b.participant_kind ?? ev.participant_kind,
       lane_count: b.lane_count ?? ev.lane_count,
       prelim_max: b.prelim_max ?? ev.prelim_max
     };
