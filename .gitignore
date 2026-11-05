@@ -6,6 +6,9 @@ build/
 logs/
 .env
 .env.*
+# 环境变量模板必须入库（.env.* 会误伤它）
+!**/.env.example
+!**/.env.sample
 deploy/secrets/
 *.pem
 *.key

@@ -1,0 +1,252 @@
+/* ============================================================
+   体育竞赛管理系统 · 设计令牌 v2（高级感升级版）
+   ------------------------------------------------------------
+   用法：替换 frontend/src/styles.css 的第 1-86 行
+        （令牌区 + 基础区保留原样，改动集中在下面四段）
+   配套规范见 DESIGN-SYSTEM-UPGRADE.md
+   ============================================================ */
+
+:root {
+  /* ---------- 品牌色阶（补全，替换 TDesign 默认 #0052d9） ---------- */
+  --td-brand-color:        #2563eb;
+  --td-brand-color-hover:  #3b82f6;
+  --td-brand-color-active: #1d4ed8;
+  --td-brand-color-light:  #eff4ff;
+  --td-brand-color-focus:  #dbe6ff;
+  --td-brand-color-border: #c7d9fe;
+  --td-brand-color-light-2:#f6f8ff;
+
+  /* ---------- 功能色（降饱和） ---------- */
+  --app-success:       #059669;
+  --app-success-light: #e8f6f0;
+  --app-warning:       #d97706;
+  --app-warning-light: #fef3e6;
+  --app-error:         #dc2626;
+  --app-error-light:   #fdecec;
+
+  /* ---------- 中性面（冷灰阶，拉开层次） ---------- */
+  --app-bg:        #f6f7f9;   /* 页面底 */
+  --app-bg-2:      #f1f3f7;   /* 次级底（表头/工具条/hover） */
+  --app-surface:   #ffffff;   /* 卡片面 */
+  --app-surface-2: #fafbfc;   /* 卡片内嵌块 */
+  --app-surface-3: #f4f6f9;   /* 卡片内分组底 */
+  --app-sidebar-bg:   #101725;
+  --app-sidebar-bg-2: #0b111c;
+
+  /* ---------- 中性线 ---------- */
+  --app-border:        #e4e8ef;
+  --app-border-2:      #eef1f5;
+  --app-border-strong: #d5dbe5;
+
+  /* ---------- 中性字（实色冷灰，替代 rgba 黑） ---------- */
+  --app-text-1:       #0f172a;
+  --app-text-2:       #475569;
+  --app-text-3:       #8a94a6;
+  --app-text-inverse: #ffffff;
+
+  /* ---------- 阴影（三档，负偏移让卡片"浮"起来） ---------- */
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 1px 2px rgba(15, 23, 42, 0.04),
+              0 6px 16px -4px rgba(15, 23, 42, 0.10);
+  --shadow-3: 0 12px 32px -8px rgba(15, 23, 42, 0.22);
+
+  /* ---------- 字号阶梯（补 15/18/22，26 与 34 不再断崖） ---------- */
+  --fs-11: 11px;  /* 辅助说明 */
+  --fs-12: 12px;  /* 次要正文/标签 */
+  --fs-13: 13px;  /* 正文-表格 */
+  --fs-14: 14px;  /* 正文 */
+  --fs-15: 15px;  /* 小标题 */
+  --fs-16: 16px;  /* 卡片标题 */
+  --fs-18: 18px;  /* 区块标题 */
+  --fs-20: 20px;  /* 页面标题 */
+  --fs-22: 22px;  /* 大标题 */
+  --fs-26: 26px;  /* 指标数字 */
+  --fs-34: 34px;  /* 大屏数字 */
+
+  /* ---------- 圆角（补语义层级） ---------- */
+  --radius-xs:   2px;   /* 徽章/小色块 */
+  --radius-s:    6px;   /* 标签/输入框 */
+  --radius-m:    8px;   /* 按钮/小卡片 */
+  --radius-l:   12px;   /* 卡片/弹窗 */
+  --radius-xl:  16px;   /* 大面板/Hero */
+  --radius-full: 999px; /* 头像/药丸 */
+
+  /* ---------- 间距（4px 基准，补大留白档） ---------- */
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
+  --sp-5: 20px;  --sp-6: 24px;  --sp-7: 28px;  --sp-8: 32px;
+  --sp-10: 40px; --sp-12: 48px;
+
+  /* ---------- 动效 ---------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.15s;
+  --dur-mid: 0.25s;
+}
+
+/* ============================================================
+   暗色模式（整体冷调降饱和，替换原第 69-86 行）
+   ============================================================ */
+[theme-mode="dark"] {
+  --td-brand-color:        #3b82f6;
+  --td-brand-color-hover:  #60a5fa;
+  --td-brand-color-active: #2563eb;
+  --td-brand-color-light:  #17243d;
+  --td-brand-color-focus:  #1d3053;
+  --td-brand-color-border: #294064;
+
+  --app-success:       #10b981;
+  --app-success-light: #10281f;
+  --app-warning:       #f59e0b;
+  --app-warning-light: #2a1f0d;
+  --app-error:         #ef4444;
+  --app-error-light:   #2c1414;
+
+  --app-bg:        #0e1219;
+  --app-bg-2:      #151b25;
+  --app-surface:   #181f2b;
+  --app-surface-2: #1d2532;
+  --app-surface-3: #212a38;
+  --app-sidebar-bg:   #0b1017;
+  --app-sidebar-bg-2: #070b10;
+
+  --app-border:        #262f3d;
+  --app-border-2:      #1f2632;
+  --app-border-strong: #364152;
+
+  --app-text-1: #e8edf5;
+  --app-text-2: #9aa6b8;
+  --app-text-3: #6b7788;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.35),
+              0 6px 16px -4px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 12px 32px -8px rgba(0, 0, 0, 0.7);
+}
+
+/* ============================================================
+   卡片：把边框加回来（这是"高级感"收益最大的一处）
+   替换原第 138-150 行
+   ============================================================ */
+.t-card {
+  border-radius: var(--radius-l);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur-mid) var(--ease-out),
+              border-color var(--dur-mid) var(--ease-out);
+  background: var(--app-surface);
+}
+
+.t-card--hover:hover {
+  box-shadow: var(--shadow-2);
+  border-color: var(--app-border-strong);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   页面骨架（新增）
+   ------------------------------------------------------------
+   1) .page        统一页面容器，带最大宽度，避免 1920 屏拉伸松散
+   2) .page-head   统一页面头：标题 + 描述 + 右侧操作区
+   3) .icon-tone   指标卡图标色调（替代 Dashboard.vue 的内联渐变）
+   4) .hero-dark   深墨蓝 Hero（替代三色渐变 + 装饰圆）
+   ============================================================ */
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-1);
+}
+
+.page-title {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--app-text-1);
+}
+
+.page-desc {
+  margin: 3px 0 0;
+  font-size: var(--fs-13);
+  color: var(--app-text-2);
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* 指标卡图标色调 */
+.icon-tone {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.icon-tone.tone-blue   { background: #eff4ff; color: #1d4ed8; }
+.icon-tone.tone-green  { background: #e8f6f0; color: #047857; }
+.icon-tone.tone-orange { background: #fef2e8; color: #b45309; }
+.icon-tone.tone-violet { background: #f3eefe; color: #6d28d9; }
+.icon-tone.tone-red    { background: #fdecec; color: #b91c1c; }
+[theme-mode="dark"] .icon-tone.tone-blue   { background: #17243d; color: #93b4fb; }
+[theme-mode="dark"] .icon-tone.tone-green  { background: #10281f; color: #5cd3a3; }
+[theme-mode="dark"] .icon-tone.tone-orange { background: #2a1f0d; color: #f5b755; }
+[theme-mode="dark"] .icon-tone.tone-violet { background: #221a38; color: #bda4f5; }
+[theme-mode="dark"] .icon-tone.tone-red    { background: #2c1414; color: #f79191; }
+
+/* 深墨蓝 Hero */
+.hero-dark {
+  position: relative;
+  border-radius: var(--radius-xl);
+  padding: var(--sp-5) var(--sp-6);
+  color: #fff;
+  overflow: hidden;
+  background:
+    linear-gradient(0deg,  rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 100% 22px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 22px 100%,
+    linear-gradient(135deg, #0b1220 0%, #10233f 55%, #14356b 100%);
+  box-shadow: var(--shadow-3);
+}
+
+.hero-dark::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #60a5fa, #2563eb);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+}
+
+.hero-dark > * { position: relative; z-index: 1; }
+
+/* ============================================================
+   杂色统一（替换散落各处的硬编码）
+   ============================================================ */
+.tone-muted      { color: var(--app-text-3); }
+.tone-success    { color: var(--app-success); }
+.tone-warning    { color: var(--app-warning); }
+.tone-error      { color: var(--app-error); }
+
+.pill-success {
+  background: var(--app-success-light); color: var(--app-success);
+  padding: 2px 7px; border-radius: var(--radius-xs); font-size: var(--fs-11);
+}
+.pill-warning {
+  background: var(--app-warning-light); color: var(--app-warning);
+  padding: 2px 7px; border-radius: var(--radius-xs); font-size: var(--fs-11);
+}
+.pill-error {
+  background: var(--app-error-light); color: var(--app-error);
+  padding: 2px 7px; border-radius: var(--radius-xs); font-size: var(--fs-11);
+}
