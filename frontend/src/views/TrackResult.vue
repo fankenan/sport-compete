@@ -28,14 +28,14 @@
           @change="loadHeats"
         />
         <t-button theme="primary" @click="loadHeats">查询</t-button>
-        <t-button variant="outline" @click="openArrange">分组编排</t-button>
+        <t-button variant="outline" @click="goArrange">分组编排</t-button>
         <t-button variant="outline" @click="openAdvance" :disabled="!filter.event_item_id">晋级录取</t-button>
         <span class="hint">成绩录入支持：11.23 / 1:23.45 / 5.62，未完赛填 DNS·DNF·DQ·NM</span>
       </div>
 
       <!-- 赛次分组 -->
       <div v-if="!heats.length" class="empty-tip">
-        {{ loading ? '加载中…' : '暂无赛次分组，请先「分组编排」' }}
+        {{ loading ? '加载中…' : '暂无赛次分组，请先到「田径项目 → 分组编排」编排' }}
       </div>
 
       <div v-for="h in heats" :key="h.id" class="heat-block">
@@ -155,42 +155,6 @@
         </t-table>
       </div>
     </t-card>
-
-    <!-- 分组编排 -->
-    <t-dialog v-model:visible="arrangeDialog" header="分组编排" :width="isMobile ? '94%' : '560px'" attach="body">
-      <t-form :data="arrangeForm" label-width="110px" label-align="right">
-        <t-form-item label="项目" required-mark>
-          <t-select v-model="arrangeForm.event_item_id" style="width: 100%" :options="eventOptions" />
-        </t-form-item>
-        <t-form-item label="组别" required-mark>
-          <t-select v-model="arrangeForm.band_id" style="width: 100%" :options="bandOptions" />
-        </t-form-item>
-        <t-form-item label="赛次">
-          <t-select v-model="arrangeForm.round_code" style="width: 160px" :options="ROUND_LIST" />
-        </t-form-item>
-        <t-divider align="left">编排参数</t-divider>
-        <t-form-item label="道次（容量）">
-          <t-input-number v-model="arrangeForm.lane_count" :min="1" :max="12" :step="1" />
-          <span class="unit">每组最多几人</span>
-        </t-form-item>
-        <t-form-item label="分组方式">
-          <t-select v-model="arrangeForm.round_mode" style="width: 180px" :options="ROUND_MODE_LIST" />
-        </t-form-item>
-        <t-form-item v-if="arrangeForm.round_mode === 'FIXED'" label="固定组数">
-          <t-input-number v-model="arrangeForm.fixed_heat_count" :min="1" :max="32" :step="1" />
-        </t-form-item>
-        <t-form-item label="道次分配">
-          <t-select v-model="arrangeForm.lane_order_mode" style="width: 200px" :options="LANE_MODE_LIST" />
-        </t-form-item>
-        <t-form-item label="排序依据">
-          <t-select v-model="arrangeForm.seed_mode" style="width: 180px" :options="SEED_LIST" />
-        </t-form-item>
-      </t-form>
-      <template #footer>
-        <t-button variant="outline" @click="arrangeDialog = false">取消</t-button>
-        <t-button theme="primary" :loading="arranging" @click="runArrange">开始编排</t-button>
-      </template>
-    </t-dialog>
 
     <!-- 晋级录取 -->
     <t-dialog v-model:visible="advanceDialog" header="晋级录取" :width="isMobile ? '94%' : '560px'" attach="body">
@@ -526,56 +490,21 @@ function exportHeat(h) {
   a.click();
 }
 
-/* ---------- 分组编排 ---------- */
-const arrangeDialog = ref(false);
-const arranging = ref(false);
-const arrangeForm = reactive({
-  event_item_id: null, band_id: null, round_code: 'PRELIM',
-  round_mode: 'AUTO', lane_count: 8, heat_capacity: null,
-  fixed_heat_count: null, lane_order_mode: 'SNAKE', seed_mode: 'NONE'
-});
-
-function openArrange() {
-  arrangeForm.event_item_id = filter.event_item_id;
-  arrangeForm.band_id = filter.band_id;
-  arrangeDialog.value = true;
-}
-
-async function runArrange() {
-  if (!arrangeForm.event_item_id || !arrangeForm.band_id) {
-    message.warning('请选择项目与组别');
-    return;
-  }
-  arranging.value = true;
-  try {
-    await http.put('/track-result/arrange-rule', {
-      competition_id: store.competitionId,
-      event_item_id: arrangeForm.event_item_id,
-      band_id: arrangeForm.band_id,
-      round_code: arrangeForm.round_code,
-      round_mode: arrangeForm.round_mode,
-      lane_count: arrangeForm.lane_count,
-      heat_capacity: arrangeForm.heat_capacity,
-      fixed_heat_count: arrangeForm.fixed_heat_count,
-      lane_order_mode: arrangeForm.lane_order_mode,
-      seed_mode: arrangeForm.seed_mode
-    });
-    const r = await http.post('/track-result/arrange', {
-      competition_id: store.competitionId,
-      event_item_id: arrangeForm.event_item_id,
-      band_id: arrangeForm.band_id,
-      round_code: arrangeForm.round_code
-    });
-    message.success(r?.message || '编排完成');
-    arrangeDialog.value = false;
-    filter.event_item_id = arrangeForm.event_item_id;
-    filter.band_id = arrangeForm.band_id;
-    loadHeats();
-  } catch (e) {
-    message.error(e.message);
-  } finally {
-    arranging.value = false;
-  }
+/* ---------- 分组编排（已移到独立页 /track-arrange） ---------- */
+/*
+ * 原来这里有个「分组编排」弹窗，但「编排」属于赛前环节，藏在「成绩录入」里
+ * 容易让人找不到 —— 而球类的分组编排是独立页面，两边不对称。
+ * 现在统一：田径的分组编排在「田径项目 → 分组编排」（/track-arrange），
+ * 本页只负责录分，通过 goArrange() 跳转过去。
+ */
+function goArrange() {
+  router.push({
+    path: '/track-arrange',
+    query: {
+      event_item_id: filter.event_item_id || undefined,
+      band_id: filter.band_id || undefined
+    }
+  });
 }
 
 /* ---------- 晋级录取 ---------- */

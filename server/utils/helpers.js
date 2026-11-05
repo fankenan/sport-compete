@@ -1,17 +1,49 @@
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 /**
- * SHA256 加盐哈希（与现有项目保持一致的做法：sha256(password + salt)）
+ * 密码哈希：bcrypt（自带的逐用户随机盐）
+ *
+ * 历史包袱：老库里存的是 sha256(password + 'sport_compete')。
+ * 现在统一用 bcrypt，但**登录时仍兼容老格式**，校验通过后自动升级为 bcrypt。
+ * 见 verifyPassword / needsRehash。
  */
-function hashPassword(password, salt = 'sport_compete') {
-  return crypto.createHash('sha256').update(`${password}${salt}`).digest('hex');
+const LEGACY_SALT = 'sport_compete';
+const BCRYPT_ROUNDS = 10;
+
+function hashPassword(password) {
+  return bcrypt.hashSync(String(password), BCRYPT_ROUNDS);
+}
+
+/** 是否是老版 sha256 哈希（64 位十六进制） */
+function isLegacyHash(stored) {
+  return typeof stored === 'string' && /^[0-9a-f]{64}$/i.test(stored);
 }
 
 /**
- * 校验密码
+ * 校验密码：新老格式都支持
+ * @returns {boolean}
  */
 function verifyPassword(password, stored) {
-  return hashPassword(password) === stored;
+  if (!stored) return false;
+  if (isLegacyHash(stored)) {
+    const legacy = crypto.createHash('sha256')
+      .update(`${password}${LEGACY_SALT}`)
+      .digest('hex');
+    return legacy === stored.toLowerCase();
+  }
+  try {
+    return bcrypt.compareSync(String(password), stored);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 该哈希是否需要升级成 bcrypt（老格式 → true）
+ */
+function needsRehash(stored) {
+  return isLegacyHash(stored);
 }
 
 /**
@@ -129,7 +161,7 @@ function birthText(idCard) {
 }
 
 module.exports = {
-  hashPassword, verifyPassword, randomPassword,
+  hashPassword, verifyPassword, needsRehash, randomPassword,
   toTimeStr, addMinutes, addDays, bandLabel,
   birthFromIdCard, birthText
 };

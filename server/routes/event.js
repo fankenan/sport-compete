@@ -31,6 +31,11 @@ const TRACK_FIELDS = [
   'grade_standard_id', 'sort_no'
 ];
 
+// 武术（评分制）扩展字段
+const MARTIAL_FIELDS = [
+  'martial_judge_count', 'martial_drop_highest', 'martial_minutes'
+];
+
 router.post('/items', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
@@ -47,6 +52,9 @@ router.post('/items', roleRequired(1), async (req, res, next) => {
       b.lane_count || 8, b.prelim_max || 16];
 
     for (const f of TRACK_FIELDS) {
+      if (b[f] !== undefined) { cols.push(f); vals.push(b[f]); }
+    }
+    for (const f of MARTIAL_FIELDS) {
       if (b[f] !== undefined) { cols.push(f); vals.push(b[f]); }
     }
 
@@ -83,6 +91,9 @@ router.put('/items/:id', roleRequired(1), async (req, res, next) => {
     };
     for (const k of Object.keys(base)) { sets.push(`${k} = ?`); p.push(base[k]); }
     for (const f of TRACK_FIELDS) {
+      if (b[f] !== undefined) { sets.push(`${f} = ?`); p.push(b[f]); }
+    }
+    for (const f of MARTIAL_FIELDS) {
       if (b[f] !== undefined) { sets.push(`${f} = ?`); p.push(b[f]); }
     }
     p.push(req.params.id);

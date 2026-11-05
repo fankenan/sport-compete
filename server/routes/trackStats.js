@@ -132,7 +132,7 @@ router.delete('/virtual-groups/:id', roleRequired(1), async (req, res, next) => 
 });
 
 /** POST /api/track-stats/team-score/calc 计算团体总分 */
-router.post('/team-score/calc', roleRequired(1, 3), async (req, res, next) => {
+router.post('/team-score/calc', roleRequired(1), async (req, res, next) => {
   try {
     const { competition_id, rule_id } = req.body;
     const rule = await queryOne('SELECT * FROM team_score_rule WHERE id = ?', [rule_id]);
@@ -326,7 +326,7 @@ router.put('/grade-bonus-rules', roleRequired(1), async (req, res, next) => {
 });
 
 /** POST /api/track-stats/grade/recognize 批量认定达级 */
-router.post('/grade/recognize', roleRequired(1, 3), async (req, res, next) => {
+router.post('/grade/recognize', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
     if (!b.competition_id) return res.json(fail('缺少赛事 id'));
@@ -357,7 +357,7 @@ router.get('/grade-achievements', async (req, res, next) => {
 });
 
 /** POST /api/track-stats/grade-achievements/:id/revoke 撤销认定 */
-router.post('/grade-achievements/:id/revoke', roleRequired(1, 3), async (req, res, next) => {
+router.post('/grade-achievements/:id/revoke', roleRequired(1), async (req, res, next) => {
   try {
     await execute('UPDATE grade_achievement SET confirm_flag = 0 WHERE id = ?', [req.params.id]);
     res.json(ok(null, '已撤销认定'));
@@ -518,7 +518,7 @@ router.put('/record-bonus-rules', roleRequired(1), async (req, res, next) => {
 });
 
 /** POST /api/track-stats/record/detect 自动检测破纪录 */
-router.post('/record/detect', roleRequired(1, 3), async (req, res, next) => {
+router.post('/record/detect', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
     if (!b.competition_id) return res.json(fail('缺少赛事 id'));
@@ -546,7 +546,7 @@ router.get('/record-breaks', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/record-breaks/:id/revoke', roleRequired(1, 3), async (req, res, next) => {
+router.post('/record-breaks/:id/revoke', roleRequired(1), async (req, res, next) => {
   try {
     await execute('UPDATE record_break SET confirm_flag = 0 WHERE id = ?', [req.params.id]);
     res.json(ok(null, '已撤销'));
@@ -709,10 +709,23 @@ router.put('/public-config', roleRequired(1), async (req, res, next) => {
         await execute('UPDATE competition SET uuid = ? WHERE id = ?', [uuid, b.competition_id]);
       }
     }
-    await execute(
-      'UPDATE competition SET public_flag = ?, public_note = ? WHERE id = ?',
-      [b.public_flag ?? 0, b.public_note ?? null, b.competition_id]
-    );
+
+    // 【副作用修复】原来不管传什么，都会顺手把 public_flag 写成 0 ——
+    // 「打开大屏控制端」「生成分享码」这类操作会偷偷把公开成绩查询关掉。
+    // 现在只有明确传了 public_flag 才改它；只传 generate_uuid 时不动开关。
+    if (b.public_flag !== undefined) {
+      await execute(
+        'UPDATE competition SET public_flag = ?, public_note = ? WHERE id = ?',
+        [Number(b.public_flag) === 1 ? 1 : 0, b.public_note ?? null, b.competition_id]
+      );
+    } else {
+      const sets = ['uuid = ?'];
+      const params = [uuid];
+      if (b.public_note !== undefined) { sets.push('public_note = ?'); params.push(b.public_note); }
+      params.push(b.competition_id);
+      await execute(`UPDATE competition SET ${sets.join(', ')} WHERE id = ?`, params);
+    }
+
     res.json(ok({ uuid }, '已保存'));
   } catch (e) { next(e); }
 });

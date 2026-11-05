@@ -88,7 +88,11 @@
               :style="{ left: c.x + 'px', top: c.y + 'px', '--d': (i * 0.03) + 's' }"
               :title="`第${c.seq_no}场｜${c.venue || '未安排'} ${c.play_date || ''} ${c.start_time || ''}`"
             >
-              <div class="bs-no">{{ c.round === 0 ? '第' + (i + 1) + '场' : '第' + (i + 1) + '场' }}</div>
+              <!-- 【Bug 修复】原来三元两个分支一模一样（都是「第 i+1 场」），
+                   显示的是「当前列内的序号」，不是真实场次号 ——
+                   每一列都会出现「第1场」，观众看到的场次号是错的。
+                   真实场次号在 c.seq_no（hover title 里能看到）。 -->
+              <div class="bs-no">第 {{ c.seq_no }} 场</div>
               <div class="bs-ts">
                 <div class="bs-t" :class="{ win: isWin(c, 'a'), lose: isLose(c, 'a') }">{{ c.team_a || '待定' }}</div>
                 <div class="bs-t" :class="{ win: isWin(c, 'b'), lose: isLose(c, 'b') }">{{ c.team_b || '待定' }}</div>
@@ -329,20 +333,21 @@ html.bs-no-anim .bs-champ {
 
 <style scoped>
 .bs-page {
-  --tx: #e9efff;
-  --dm: #8494b5;
-  --card: rgba(255, 255, 255, .075);
-  --cb: rgba(150, 180, 255, .24);
-  --cy: #2ee6d6;
-  --pu: #9b5cff;
-  --gd: #ffc531;
+  --tx: #e6edf9;
+  --dm: #8b9bb7;
+  --card: rgba(255, 255, 255, .06);
+  --cb: rgba(148, 178, 235, .20);
+  --cy: #4f9cf9;
+  --pu: #8b7bf0;
+  --gd: #e8b451;
   position: relative;
   min-height: 100vh;
   padding: 0 0 56px;
-  background: #05070e;
+  background: #0d1220;
   color: var(--tx);
   overflow-x: hidden;
-  font-family: "HarmonyOS Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  font-family: MiSans, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
 }
 
 .bs-bg {
@@ -351,9 +356,8 @@ html.bs-no-anim .bs-champ {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(900px 620px at 10% -12%, rgba(46, 230, 214, .17), transparent 62%),
-    radial-gradient(820px 600px at 92% -6%, rgba(155, 92, 255, .20), transparent 62%),
-    radial-gradient(1100px 700px at 50% 118%, rgba(255, 197, 49, .09), transparent 62%);
+    radial-gradient(900px 620px at 12% -12%, rgba(79, 156, 249, .14), transparent 62%),
+    radial-gradient(1000px 700px at 50% 118%, rgba(139, 123, 240, .08), transparent 62%);
 }
 
 .bs-header, .bs-nav, .bs-main { position: relative; z-index: 1; }
@@ -365,9 +369,9 @@ html.bs-no-anim .bs-champ {
 }
 .bs-header h1 {
   font-size: 34px; font-weight: 800; letter-spacing: .05em; line-height: 1.14; margin: 0;
-  background: linear-gradient(100deg, #2ee6d6 0%, #7dd3fc 26%, #9b5cff 58%, #ffc531 100%);
+  background: linear-gradient(100deg, #7db4fb 0%, #4f9cf9 45%, #a99bf5 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 6px 30px rgba(46, 230, 214, .22));
+  filter: drop-shadow(0 6px 30px rgba(79, 156, 249, .20));
 }
 .bs-meta { margin-top: 10px; font-size: 13px; color: var(--dm); letter-spacing: .1em; }
 .bs-meta i {
@@ -391,15 +395,15 @@ html.bs-no-anim .bs-champ {
   color: var(--dm); font: inherit; font-size: 14px; letter-spacing: .06em;
   padding: 9px 22px; border-radius: 999px; cursor: pointer; transition: .22s;
 }
-.bs-tab:hover { color: #fff; border-color: rgba(46, 230, 214, .5); background: rgba(46, 230, 214, .07); }
+.bs-tab:hover { color: #fff; border-color: rgba(79, 156, 249, .55); background: rgba(79, 156, 249, .08); }
 .bs-tab.on {
-  color: #04121a; font-weight: 700; border-color: transparent;
-  background: linear-gradient(120deg, #2ee6d6, #5eead4);
-  box-shadow: 0 8px 26px -8px rgba(46, 230, 214, .75);
+  color: #06101f; font-weight: 700; border-color: transparent;
+  background: linear-gradient(120deg, #4f9cf9, #74b4fb);
+  box-shadow: 0 8px 26px -10px rgba(79, 156, 249, .7);
 }
 .bs-tab.ev.on {
-  background: linear-gradient(120deg, #9b5cff, #c4a2ff); color: #0b0424;
-  box-shadow: 0 8px 26px -8px rgba(155, 92, 255, .8);
+  background: linear-gradient(120deg, #8b7bf0, #a99bf5); color: #0b0620;
+  box-shadow: 0 8px 26px -10px rgba(139, 123, 240, .72);
 }
 
 .bs-main { padding: 0 0 10px; }

@@ -1,6 +1,6 @@
 -- ============================================================
 -- 迁移：运动员增加照片与学籍表
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < migrate_athlete_file.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < migrate_athlete_file.sql
 -- ============================================================
 
 SET NAMES utf8mb4;

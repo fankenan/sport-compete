@@ -1,7 +1,7 @@
 -- ============================================================
 -- 体育竞赛管理系统 · 种子数据
 -- 用途：部署后立即看到真实效果
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < seed.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < seed.sql
 -- ============================================================
 
 SET NAMES utf8mb4;

@@ -21,10 +21,26 @@
           <t-option v-for="b in bands" :key="b.id" :label="bandLabel(b)" :value="b.id" />
         </t-select>
         <t-button theme="primary" @click="doPreview">分组预览</t-button>
-        <t-button theme="success" :disabled="!eventItemId" @click="doGenerate">执行分组</t-button>
-        <t-button theme="warning" :disabled="!eventItemId" @click="doGenerateMatches">生成小组赛程</t-button>
-        <t-button v-if="currentEvent && currentEvent.category === 1" :disabled="!eventItemId" @click="doTrackGenerate">
-          径赛分组
+      <t-button theme="success" :disabled="!eventItemId" @click="doGenerate">执行分组</t-button>
+      <t-button
+        v-if="!isLeagueMode"
+        theme="warning"
+        :disabled="!eventItemId"
+        @click="doGenerateMatches"
+      >生成小组赛程</t-button>
+      <t-button
+        v-else
+        theme="warning"
+        :disabled="!eventItemId"
+        @click="doGenerateLeague"
+      >生成联赛赛程</t-button>
+        <t-button
+          v-if="currentEvent && currentEvent.category === 1"
+          variant="outline"
+          :disabled="!eventItemId"
+          @click="goTrackArrange"
+        >
+          径赛分组编排 →
         </t-button>
         <t-button variant="outline" @click="loadGroups">刷新</t-button>
       </div>
@@ -203,6 +219,12 @@ const standingColumns = [
 
 const currentEvent = computed(() => events.value.find((e) => e.id === eventItemId.value) || null);
 
+/** 联赛/循环赛赛制：不分组，所有队大循环 */
+const isLeagueMode = computed(() => {
+  const m = currentEvent.value?.schedule_mode;
+  return m === 'LEAGUE' || m === 'ROUND';
+});
+
 
 function pairingLabel(v) {
   return { 1: '首尾配对', 2: '交叉配对', 3: '对位配对' }[v] || '首尾配对';
@@ -375,33 +397,46 @@ async function doGenerateMatches() {
   }
 }
 
-async function doTrackGenerate() {
+/**
+ * 生成联赛赛程（不分组，所有队大循环）
+ * 联赛赛制（schedule_mode = LEAGUE / ROUND）走这个入口。
+ */
+async function doGenerateLeague() {
   if (!eventItemId.value) {
     message.warning('请先选择项目');
     return;
   }
-  // 2026-10-27：本端点写入旧表 heat_group/heat_member，成绩录入页读的是 track_heat/heat_entry，
-  // 在这里生成的分组成绩录入页看不到。P1 统一路径前先做提示，行为保持不变。
   try {
-    await confirm(
-      '这里生成的径赛分组，「成绩录入」页看不到 —— 两边用的不是同一套数据。\n建议改用「成绩录入 → 分组编排」。',
-      '建议改用成绩录入页',
-      { confirmBtn: '仍按旧方式生成', cancelBtn: '去成绩录入页' }
-    );
-  } catch (e) {
-    router.push('/track-result');
-    return;
-  }
-  try {
-    await http.post('/group/track-generate', {
+    const r = await http.post('/group/generate-league', {
       competition_id: store.competitionId,
       event_item_id: eventItemId.value
     });
-    message.success('径赛分组已生成（旧表，成绩录入页不可见）');
-    loadGroups();
+    message.success(`已生成 ${r.count || 0} 场联赛赛程（场序 ${r.seqFrom}-${r.seqTo}）`);
+    loadStanding();
   } catch (e) {
     message.error(e.message);
   }
+}
+
+/**
+ * 径赛分组编排 → 跳到独立的「田径分组编排」页
+ *
+ * 【P0 修复】原来这里有个「径赛分组」按钮，调 /group/track-generate，
+ * 把分组写进旧表 heat_group / heat_member —— 而成绩录入页读的是
+ * track_heat / heat_entry，两边互不可见。
+ * 最恶劣的地方是：它会返回「已生成 N 个径赛分组」的成功提示，
+ * **告诉用户成功了，数据却进了黑洞**。
+ * 现在这个入口直接跳到正确的地方，不再有黑洞路径。
+ */
+function goTrackArrange() {
+  if (!eventItemId.value) {
+    message.warning('请先选择项目');
+    return;
+  }
+  router.push({
+    path: '/track-arrange',
+    query: { event_item_id: eventItemId.value }
+  });
 }
 
 async function changeSeed(member, seed) {
@@ -465,6 +500,8 @@ watch(() => store.competitionId, () => {
 }
 
 .panel-head {
+  width: 100%;
+  gap: var(--sp-3);
   display: flex;
   align-items: center;
   justify-content: space-between;

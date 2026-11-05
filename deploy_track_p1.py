@@ -3,8 +3,28 @@
 import os
 import paramiko
 
+# ---- 凭据从环境变量读取（不要写死在代码里）----
+# 必填：SPORT_SSH_PASSWORD
+# 选填：SPORT_SSH_HOST / SPORT_SSH_USER / SPORT_SUDO_PASSWORD / SPORT_DB_PASSWORD
+_ENV = os.environ.copy()
+_ENV['SPORT_SSH_HOST'] = os.environ.get('SPORT_SSH_HOST', '10.128.1.45')
+_ENV['SPORT_SSH_USER'] = os.environ.get('SPORT_SSH_USER', 'single')
+_ENV['SPORT_SSH_PASSWORD'] = os.environ.get('SPORT_SSH_PASSWORD', '')
+_ENV['SPORT_SUDO_PASSWORD'] = os.environ.get('SPORT_SUDO_PASSWORD', '')
+_ENV['SPORT_DB_PASSWORD'] = os.environ.get('SPORT_DB_PASSWORD', '')
+
+if not _ENV['SPORT_SSH_PASSWORD']:
+    raise SystemExit(
+        '[安全] 缺少环境变量 SPORT_SSH_PASSWORD。\n'
+        '  本脚本会连接真实服务器，凭据不再写在代码里。\n'
+        '  请先 export SPORT_SSH_PASSWORD=... 后重试。'
+    )
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-HOST, USER, PWD = '10.128.1.45', 'single', 'jyj2026'
+HOST = _ENV['SPORT_SSH_HOST']
+USER = _ENV['SPORT_SSH_USER']
+PWD  = _ENV['SPORT_SSH_PASSWORD']
 REMOTE = '/home/single/sport-compete/server'
 
 cli = paramiko.SSHClient()
@@ -12,8 +32,24 @@ cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 cli.connect(HOST, 22, USER, PWD, timeout=15)
 
 
+
+def _env(name, fallback=None):
+    """读环境变量；未设置时返回 fallback（可为 None 表示必须显式配置）"""
+    return os.environ.get(name, fallback)
+
+
+def _require_env(name):
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(
+            '[安全] 缺少环境变量 %s。\n'
+            '  本脚本会连接真实服务器/数据库，凭据不再写在代码里。\n'
+            '  请先设置环境变量后重试。' % name
+        )
+    return v
+
 def run(cmd, t=180):
-    _, o, e = cli.exec_command(cmd, timeout=t)
+    _, o, e = cli.exec_command(cmd, timeout=t, env=_ENV)
     return o.read().decode('utf-8', 'replace').strip(), e.read().decode('utf-8', 'replace').strip()
 
 
@@ -33,14 +69,14 @@ o, e = run('for f in index.js routes/track.js routes/event.js services/scoreEngi
            f'do node --check {REMOTE}/$f || echo "FAIL $f"; done; echo SYNTAX_OK')
 print('syntax:', o or e)
 
-o, e = run('echo jyj2026 | sudo -S systemctl restart sport-compete-backend && sleep 2 && systemctl is-active sport-compete-backend')
+o, e = run('echo $SPORT_SUDO_PASSWORD | sudo -S systemctl restart sport-compete-backend && sleep 2 && systemctl is-active sport-compete-backend')
 print('service:', o or e)
 
 script = r'''cd /home/single/sport-compete/server
 export TOKEN=$(set -a; . ./.env; set +a; node -e "const jwt=require('jsonwebtoken');console.log(jwt.sign({id:1,username:'admin',role:1,school_id:0,real_name:'t'},process.env.JWT_SECRET,{expiresIn:'30m'}))")
 H="Authorization: Bearer $TOKEN"
 B="http://127.0.0.1:4100/api"
-CID=$(mysql -ucompete -pCompete@2026 sport_compete -N -e "SELECT id FROM competition ORDER BY id DESC LIMIT 1")
+CID=$(mysql -ucompete -p$SPORT_DB_PASSWORD sport_compete -N -e "SELECT id FROM competition ORDER BY id DESC LIMIT 1")
 echo "赛事 id = $CID"
 
 echo "=== 1. 项目模板库（径赛）==="
@@ -53,11 +89,11 @@ echo "=== 3. 评分公式（男子）==="
 curl -s "$B/track/score-tables?gender=M" -H "$H" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log('共',j.data.length,'条');console.log(j.data.slice(0,3).map(t=>t.event_key+' A='+t.coefficient_a+' B='+t.coefficient_b+' C='+t.coefficient_c).join(' | '))})"
 
 echo "=== 4. 试算：男子100米 10.50 秒 ==="
-SID=$(mysql -ucompete -pCompete@2026 sport_compete -N -e "SELECT id FROM score_table WHERE event_key='100M' AND gender='M' LIMIT 1")
+SID=$(mysql -ucompete -p$SPORT_DB_PASSWORD sport_compete -N -e "SELECT id FROM score_table WHERE event_key='100M' AND gender='M' LIMIT 1")
 curl -s -X POST "$B/track/score/preview" -H "$H" -H "Content-Type: application/json" -d "{\"score_table_id\":$SID,\"entry_type\":\"TIME\",\"value\":\"10.50\"}"
 echo
 echo "=== 5. 试算：男子跳高 2.00 米 ==="
-SID2=$(mysql -ucompete -pCompete@2026 sport_compete -N -e "SELECT id FROM score_table WHERE event_key='HJ' AND gender='M' LIMIT 1")
+SID2=$(mysql -ucompete -p$SPORT_DB_PASSWORD sport_compete -N -e "SELECT id FROM score_table WHERE event_key='HJ' AND gender='M' LIMIT 1")
 curl -s -X POST "$B/track/score/preview" -H "$H" -H "Content-Type: application/json" -d "{\"score_table_id\":$SID2,\"entry_type\":\"HEIGHT\",\"value\":\"2.00\"}"
 echo
 echo "=== 6. 成绩解析 ==="
@@ -73,7 +109,7 @@ curl -s "$B/track/meet-config?competition_id=$CID" -H "$H" | node -e "let d='';p
 echo "=== 8. 从模板批量建项目 ==="
 curl -s -X POST "$B/track/events/from-template" -H "$H" -H "Content-Type: application/json" -d "{\"competition_id\":$CID,\"template_ids\":[3,4,20]}"
 echo
-mysql -ucompete -pCompete@2026 sport_compete -e "SELECT id,name,event_type,result_entry_type,event_unit,is_higher_better FROM event_item WHERE competition_id=$CID ORDER BY id DESC LIMIT 6"
+mysql -ucompete -p$SPORT_DB_PASSWORD sport_compete -e "SELECT id,name,event_type,result_entry_type,event_unit,is_higher_better FROM event_item WHERE competition_id=$CID ORDER BY id DESC LIMIT 6"
 
 echo "=== 9. 新建全能项目（带评分绑定）==="
 curl -s -X POST "$B/track/combined" -H "$H" -H "Content-Type: application/json" -d "{\"competition_id\":$CID,\"name\":\"高中男子五项全能\",\"gender\":\"M\",\"children\":[{\"name\":\"五项·跳远\",\"event_type\":\"FIELD\",\"result_entry_type\":\"DISTANCE\",\"event_unit\":\"m\",\"event_key\":\"LJ\"},{\"name\":\"五项·铅球\",\"event_type\":\"FIELD\",\"result_entry_type\":\"DISTANCE\",\"event_unit\":\"m\",\"event_key\":\"SP\"},{\"name\":\"五项·200米\",\"event_type\":\"TRACK\",\"result_entry_type\":\"TIME\",\"event_unit\":\"s\",\"event_key\":\"200M\"},{\"name\":\"五项·跳高\",\"event_type\":\"FIELD\",\"result_entry_type\":\"HEIGHT\",\"event_unit\":\"m\",\"event_key\":\"HJ\"},{\"name\":\"五项·1500米\",\"event_type\":\"TRACK\",\"result_entry_type\":\"TIME\",\"event_unit\":\"s\",\"event_key\":\"1500M\"}]}"

@@ -555,19 +555,28 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/*
+ * 视觉收敛说明：
+ * 原来这里是一整套「电竞霓虹」变量（荧光青 #2ee6d6、紫 #9b5cff、近黑底 #05070e），
+ * 还把字体栈改回 HarmonyOS Sans 绕开 MiSans —— 从主站点进来像换了另一个产品。
+ * 现在保留深色沉浸感（对阵树确实适合深色），但：
+ *   1) 主色系统一到品牌蓝的深色变体
+ *   2) 字体回到 MiSans 全站统一
+ *   3) 背景光晕从三色霓虹改成单色低饱和
+ */
 .bp-page {
-  --tx: #e9efff; --dm: #8494b5; --card: rgba(255,255,255,.07); --cb: rgba(150,180,255,.24);
-  --cy: #2ee6d6; --pu: #9b5cff; --gd: #ffc531;
+  --tx: #e6edf9; --dm: #8b9bb7; --card: rgba(255,255,255,.055); --cb: rgba(148,178,235,.20);
+  --cy: #4f9cf9; --pu: #8b7bf0; --gd: #e8b451;
   position: relative; min-height: 100vh; padding: 0 0 40px;
-  background: #05070e; color: var(--tx); overflow-x: hidden;
-  font-family: "HarmonyOS Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  background: #0d1220; color: var(--tx); overflow-x: hidden;
+  font-family: MiSans, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
 }
 .bp-bg {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(900px 620px at 10% -12%, rgba(46,230,214,.15), transparent 62%),
-    radial-gradient(820px 600px at 92% -6%, rgba(155,92,255,.18), transparent 62%),
-    radial-gradient(1100px 700px at 50% 118%, rgba(255,197,49,.08), transparent 62%);
+    radial-gradient(900px 620px at 12% -12%, rgba(79,156,249,.13), transparent 62%),
+    radial-gradient(1000px 700px at 50% 118%, rgba(139,123,240,.07), transparent 62%);
 }
 .bp-head, .bp-tabs, .bp-progress, .bp-section, .bp-empty { position: relative; z-index: 1; }
 
@@ -579,7 +588,7 @@ onBeforeUnmount(() => {
   color: var(--dm); font: inherit; font-size: 12.5px; padding: 6px 16px;
   border-radius: 999px; cursor: pointer; transition: .2s;
 }
-.bp-tool:hover { color: #fff; border-color: rgba(46,230,214,.5); }
+.bp-tool:hover { color: #fff; border-color: rgba(79,156,249,.55); }
 
 .bp-tabs { display: flex; gap: 9px; flex-wrap: wrap; padding: 10px 30px 0; }
 .bp-tabs.sub { padding-top: 8px; margin-bottom: 4px; }
@@ -588,15 +597,15 @@ onBeforeUnmount(() => {
   color: var(--dm); font: inherit; font-size: 13px; padding: 7px 18px;
   border-radius: 999px; cursor: pointer; transition: .2s;
 }
-.bp-tab:hover { color: #fff; border-color: rgba(46,230,214,.5); }
+.bp-tab:hover { color: #fff; border-color: rgba(79,156,249,.55); }
 .bp-tab.on {
-  color: #04121a; font-weight: 700; border-color: transparent;
-  background: linear-gradient(120deg, #2ee6d6, #5eead4);
-  box-shadow: 0 8px 24px -10px rgba(46,230,214,.8);
+  color: #06101f; font-weight: 700; border-color: transparent;
+  background: linear-gradient(120deg, #4f9cf9, #74b4fb);
+  box-shadow: 0 8px 24px -12px rgba(79,156,249,.75);
 }
 .bp-tab.ev.on {
-  background: linear-gradient(120deg, #9b5cff, #c4a2ff); color: #0b0424;
-  box-shadow: 0 8px 24px -10px rgba(155,92,255,.8);
+  background: linear-gradient(120deg, #8b7bf0, #a99bf5); color: #0b0620;
+  box-shadow: 0 8px 24px -12px rgba(139,123,240,.7);
 }
 
 .bp-progress {
@@ -606,10 +615,10 @@ onBeforeUnmount(() => {
 }
 .bp-pl b { color: var(--tx); font-size: 13px; }
 .bp-bar { width: 110px; height: 5px; border-radius: 3px; background: rgba(140,170,255,.16); overflow: hidden; }
-.bp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #2ee6d6, #5eead4); }
+.bp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #4f9cf9, #74b4fb); }
 .bp-champ {
-  margin-left: auto; color: #ffd873; border: 1px solid rgba(255,197,49,.4);
-  background: rgba(255,197,49,.09); border-radius: 999px; padding: 3px 12px; font-size: 12px;
+  margin-left: auto; color: #ffd873; border: 1px solid rgba(232,180,81,.4);
+  background: rgba(232,180,81,.09); border-radius: 999px; padding: 3px 12px; font-size: 12px;
 }
 
 .bp-section { padding: 18px 30px 0; }
@@ -674,15 +683,15 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; overflow: hidden;
   padding: 16px 24px 18px; border-radius: 0;
   background:
-    radial-gradient(900px 620px at 10% -12%, rgba(46,230,214,.15), transparent 62%),
-    radial-gradient(820px 600px at 92% -6%, rgba(155,92,255,.18), transparent 62%),
-    #05070e;
+    radial-gradient(900px 620px at 12% -12%, rgba(79,156,249,.13), transparent 62%),
+    radial-gradient(1000px 700px at 50% 118%, rgba(139,123,240,.07), transparent 62%),
+    #0d1220;
 }
 .bp-ko.is-full .bp-sec-head { flex: 0 0 auto; }
 .bp-ko.is-full .bp-viewport { flex: 1 1 auto; max-height: none; min-height: 0; }
 .bp-rh { position: absolute; top: 0; display: flex; flex-direction: column; }
 .bp-rh b { font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #a9b8d8; }
-.bp-rh b::after { content: ""; display: block; width: 36px; height: 1px; margin-top: 6px; background: linear-gradient(90deg, rgba(46,230,214,.7), transparent); }
+.bp-rh b::after { content: ""; display: block; width: 36px; height: 1px; margin-top: 6px; background: linear-gradient(90deg, rgba(79,156,249,.7), transparent); }
 .bp-links { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
 .bp-pk { fill: none; stroke: rgba(130,180,255,.4); stroke-width: 1.8; filter: drop-shadow(0 0 4px rgba(46,230,214,.25)); }
 .bp-pk.gold { stroke: rgba(255,197,49,.7); stroke-width: 2.2; filter: drop-shadow(0 0 8px rgba(255,197,49,.5)); }
@@ -788,8 +797,8 @@ onBeforeUnmount(() => {
 }
 .bp-btn:hover { color: #fff; }
 .bp-btn.primary {
-  border-color: transparent; color: #04121a; font-weight: 700;
-  background: linear-gradient(120deg, #2ee6d6, #5eead4);
+  border-color: transparent; color: #06101f; font-weight: 700;
+  background: linear-gradient(120deg, #4f9cf9, #74b4fb);
 }
 .bp-btn.primary:disabled { opacity: .6; cursor: not-allowed; }
 

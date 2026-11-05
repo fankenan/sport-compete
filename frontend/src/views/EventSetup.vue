@@ -55,6 +55,12 @@
                     试跳 {{ row.base_attempt_count || 3 }}+{{ row.extra_attempt_count || 3 }}
                   </span>
                 </div>
+                <div v-else-if="row.category === 4" class="param-grid">
+                  <span>裁判 {{ row.martial_judge_count || 5 }}人</span>
+                  <span>{{ row.martial_drop_highest === 0 ? '不去极值' : '去最高最低' }}</span>
+                  <span>时长上限 {{ row.martial_minutes || 90 }}秒</span>
+                  <span>评分制</span>
+                </div>
                 <span v-else class="dim">—</span>
               </template>
 
@@ -147,7 +153,7 @@
     <t-dialog
       v-model:visible="itemDialog"
       :header="itemForm.id ? '编辑项目' : '新增项目'"
-      :width="isMobile ? '94%' : '520px'" attach="body">
+      :width="isMobile ? '94%' : '680px'" attach="body">
       <t-form :data="itemForm" label-width="104px" label-align="right">
         <t-form-item label="项目名称" required-mark>
           <t-input v-model="itemForm.name" placeholder="如 100米 / 篮球" :maxlength="64" />
@@ -157,19 +163,54 @@
             <t-radio :value="1">径赛</t-radio>
             <t-radio :value="2">田赛</t-radio>
             <t-radio :value="3">球类</t-radio>
+            <t-radio :value="4">武术</t-radio>
           </t-radio-group>
         </t-form-item>
         <t-form-item label="接力项目">
           <t-switch v-model="itemForm.is_relay" :custom-value="[1, 0]" />
         </t-form-item>
 
-        <template v-if="itemForm.category === 3">
-          <t-form-item label="赛制">
-            <t-radio-group v-model="itemForm.schedule_mode" variant="default-filled">
-              <t-radio-button value="GROUP_KO">分组循环 + 淘汰</t-radio-button>
-              <t-radio-button value="KO">纯淘汰</t-radio-button>
-            </t-radio-group>
+        <!-- 武术：评分制参数 -->
+        <template v-if="itemForm.category === 4">
+          <t-form-item label="裁判人数">
+            <t-input-number v-model="itemForm.martial_judge_count" :min="3" :max="11" :step="2" />
+            <span class="unit">人</span>
           </t-form-item>
+          <t-form-item label="去极值">
+            <t-switch v-model="itemForm.martial_drop_highest" :custom-value="[1, 0]" />
+            <span class="unit">去掉一个最高分和一个最低分后取平均</span>
+          </t-form-item>
+          <t-form-item label="时长上限">
+            <t-input-number v-model="itemForm.martial_minutes" :min="30" :max="600" :step="30" />
+            <span class="unit">秒</span>
+          </t-form-item>
+          <t-form-item label="参赛形式">
+            <span class="dim" style="line-height:1.7">
+              武术按<strong>学校组队</strong>报名（与球类共用报名审核流程）。<br />
+              赛事采用<strong>评分制</strong>：每位裁判独立打分，去极值后取平均，按总分排名。
+            </span>
+          </t-form-item>
+        </template>
+
+        <template v-if="itemForm.category === 3">
+          <!-- 赛制模板：先选「赛制长什么样」，高级参数按需展开 -->
+          <t-form-item label="赛制模板">
+            <div class="mode-picker">
+              <button
+                v-for="m in MODE_TEMPLATES"
+                :key="m.value"
+                type="button"
+                class="mode-card"
+                :class="{ on: itemForm.schedule_mode === m.value }"
+                @click="applyModeTemplate(m)"
+              >
+                <span class="mc-name">{{ m.label }}</span>
+                <span class="mc-desc">{{ m.desc }}</span>
+                <span class="mc-flow">{{ m.flow }}</span>
+              </button>
+            </div>
+          </t-form-item>
+
           <t-form-item label="参赛单位">
             <t-radio-group v-model="itemForm.participant_kind" variant="default-filled">
               <t-radio-button value="TEAM">学校组队</t-radio-button>
@@ -177,37 +218,92 @@
               <t-radio-button value="PAIR">双打/混双</t-radio-button>
             </t-radio-group>
           </t-form-item>
+
+          <!-- 规模预览：选完赛制立刻知道大概要打多少场 -->
+          <t-form-item v-if="modePreview" label="规模预估">
+            <div class="mode-preview">
+              <div class="mp-item">
+                <span class="mp-n">{{ modePreview.rounds }}</span>
+                <span class="mp-l">轮次</span>
+              </div>
+              <div class="mp-item">
+                <span class="mp-n">{{ modePreview.matches }}</span>
+                <span class="mp-l">总场次</span>
+              </div>
+              <div class="mp-item">
+                <span class="mp-n">{{ modePreview.days }}</span>
+                <span class="mp-l">约需天数</span>
+              </div>
+              <span class="mp-note">{{ modePreview.note }}</span>
+            </div>
+          </t-form-item>
+
+          <!-- 积分规则：原来只在后端有，前端根本设不了 -->
+          <t-form-item label="积分规则">
+            <div class="points-row">
+              <label class="pr-item">
+                <span class="pr-label">允许平局</span>
+                <t-switch v-model="itemForm.allow_draw" :custom-value="[1, 0]" />
+              </label>
+              <label class="pr-item">
+                <span class="pr-label">胜</span>
+                <t-input-number v-model="itemForm.win_points" :min="0" :max="9" :step="1" style="width: 74px" />
+                <span class="pr-label">分</span>
+              </label>
+              <label class="pr-item">
+                <span class="pr-label">平</span>
+                <t-input-number v-model="itemForm.draw_points" :min="0" :max="9" :step="1" style="width: 74px" />
+                <span class="pr-label">分</span>
+              </label>
+              <label class="pr-item">
+                <span class="pr-label">负</span>
+                <span class="pr-label">0 分</span>
+              </label>
+            </div>
+            <p class="pr-hint">
+              篮球、排球等没有平局的比赛请关闭「允许平局」；否则积分榜会出现平局，
+              淘汰赛阶段也会因无法判定晋级而卡住。
+            </p>
+          </t-form-item>
+
+          <!-- 分组循环 + 淘汰 / 联赛：需要分组参数 -->
+          <template v-if="itemForm.schedule_mode === 'GROUP_KO' || itemForm.schedule_mode === 'LEAGUE'">
+            <t-form-item label="单场时长">
+              <t-input-number v-model="itemForm.match_minutes" :min="1" :max="120" :step="1" />
+              <span class="unit">分钟</span>
+            </t-form-item>
+            <t-form-item label="槽位间隔">
+              <t-input-number v-model="itemForm.slot_interval" :min="5" :max="180" :step="5" />
+              <span class="unit">分钟</span>
+            </t-form-item>
+          </template>
+
+          <template v-if="itemForm.schedule_mode === 'GROUP_KO'">
+            <t-form-item label="分组数">
+              <t-input-number v-model="itemForm.group_count" :min="0" :max="32" :step="1" />
+              <span class="unit">组（0 按队数自动）</span>
+            </t-form-item>
+            <t-form-item label="每组轮次">
+              <t-input-number v-model="itemForm.rounds_per_group" :min="0" :max="15" :step="1" />
+              <span class="unit">轮（0 按队数自动）</span>
+            </t-form-item>
+            <t-form-item label="出线人数">
+              <t-input-number v-model="itemForm.advance_count" :min="0" :max="64" :step="1" />
+              <span class="unit">人</span>
+            </t-form-item>
+            <t-form-item label="配对规则">
+              <t-select v-model="itemForm.pairing_rule" style="width: 100%" :options="PAIRING_LIST" />
+            </t-form-item>
+            <t-form-item label="打三四名">
+              <t-switch v-model="itemForm.has_third_place" :custom-value="[1, 0]" />
+            </t-form-item>
+          </template>
+
           <t-form-item v-if="itemForm.schedule_mode === 'KO'" label="提示">
             <span class="dim" style="line-height:1.7">
               纯淘汰不分小组，报名审核通过后直接生成对阵树，<br />
               人数不是 2 的幂时自动安排轮空（如 18 人 → 2 场预赛 + 14 人轮空进 16 强）
             </span>
-          </t-form-item>
-          <t-form-item label="单场时长">
-            <t-input-number v-model="itemForm.match_minutes" :min="1" :max="120" :step="1" />
-            <span class="unit">分钟</span>
-          </t-form-item>
-          <t-form-item label="槽位间隔">
-            <t-input-number v-model="itemForm.slot_interval" :min="5" :max="180" :step="5" />
-            <span class="unit">分钟</span>
-          </t-form-item>
-          <t-form-item label="分组数">
-            <t-input-number v-model="itemForm.group_count" :min="0" :max="32" :step="1" />
-            <span class="unit">组（0 按队数自动）</span>
-          </t-form-item>
-          <t-form-item label="每组轮次">
-            <t-input-number v-model="itemForm.rounds_per_group" :min="0" :max="15" :step="1" />
-            <span class="unit">轮（0 按队数自动）</span>
-          </t-form-item>
-          <t-form-item label="出线人数">
-            <t-input-number v-model="itemForm.advance_count" :min="0" :max="64" :step="1" />
-            <span class="unit">人</span>
-          </t-form-item>
-          <t-form-item label="配对规则">
-            <t-select v-model="itemForm.pairing_rule" style="width: 100%" :options="PAIRING_LIST" />
-          </t-form-item>
-          <t-form-item label="打三四名">
-            <t-switch v-model="itemForm.has_third_place" :custom-value="[1, 0]" />
           </t-form-item>
         </template>
 
@@ -410,7 +506,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useUserStore } from '../store/user';
 import http from '../api/http';
 import { message, confirm } from '../utils/ui';
@@ -493,7 +589,14 @@ const itemForm = reactive({
   has_third_place: 1,
   schedule_mode: 'GROUP_KO',
   participant_kind: 'TEAM',
-      lane_count: 8,
+  allow_draw: 0,
+  win_points: 3,
+  draw_points: 1,
+  // 武术（评分制）参数
+  martial_judge_count: 5,
+  martial_drop_highest: 1,
+  martial_minutes: 90,
+  lane_count: 8,
   prelim_max: 16,
   // 田径参数
   event_type: 'TRACK',
@@ -512,6 +615,110 @@ const itemForm = reactive({
   estimated_unit_minutes: null
 });
 
+/* ---------- 赛制模板 ----------
+   以前这里是一个两选一的 radio（分组循环+淘汰 / 纯淘汰），
+   管理员根本不知道自己的项目该选哪个。现在每种赛制都写清楚
+   「怎么打、打多少场、最后怎么排名」，选完立刻看到规模预估。
+*/
+const MODE_TEMPLATES = [
+  {
+    value: 'GROUP_KO',
+    label: '分组循环 + 淘汰',
+    desc: '先分小组循环赛，各组出线后打淘汰赛决出冠军',
+    flow: '分组 → 循环 → 出线 → 淘汰赛 → 决赛'
+  },
+  {
+    value: 'KO',
+    label: '纯淘汰',
+    desc: '不分组，一轮定胜负，输一场即被淘汰，人数不足自动轮空',
+    flow: '报名 → 对阵树 → 逐轮淘汰 → 决赛'
+  },
+  {
+    value: 'LEAGUE',
+    label: '联赛循环',
+    desc: '不分组，所有队轮流交手，按总积分排最终名次',
+    flow: '报名 → 每周一轮 → 总积分排名'
+  },
+  {
+    value: 'ROUND',
+    label: '循环赛排名',
+    desc: '不打淘汰赛，所有队循环交手后按积分直接定名次',
+    flow: '报名 → 单循环 → 积分排名'
+  }
+];
+
+/** 切换赛制模板时自动带上该赛制的推荐参数 */
+function applyModeTemplate(m) {
+  itemForm.schedule_mode = m.value;
+  if (m.value === 'KO') {
+    // 淘汰赛：不允许平局
+    itemForm.allow_draw = 0;
+    itemForm.win_points = 3;
+    itemForm.draw_points = 0;
+  } else if (m.value === 'LEAGUE' || m.value === 'ROUND') {
+    // 联赛：按总积分排名，不设出线人数
+    itemForm.allow_draw = 1;
+    itemForm.win_points = 3;
+    itemForm.draw_points = 1;
+    itemForm.group_count = 0;
+    itemForm.rounds_per_group = 0;
+  } else {
+    itemForm.allow_draw = 0;
+    itemForm.win_points = 3;
+    itemForm.draw_points = 0;
+  }
+}
+
+/**
+ * 规模预估：按已报名人数估算轮次与场次。
+ * 没有报名数据时只给出按典型规模的参考值。
+ */
+const modePreview = computed(() => {
+  if (itemForm.category !== 3) return null;
+  const mode = itemForm.schedule_mode;
+  const n = Math.max(2, Number(teamsCount.value) || 0);
+  const hasData = Number(teamsCount.value) > 0;
+
+  if (mode === 'KO') {
+    if (!hasData) return { rounds: '—', matches: '—', days: '—', note: '按 16 人估算：4 轮 15 场' };
+    const size = 2 ** Math.ceil(Math.log2(n));
+    const rounds = Math.round(Math.log2(size));
+    return {
+      rounds,
+      matches: n - 1,
+      days: Math.max(1, Math.ceil(rounds / 3)),
+      note: size > n ? `${n} 人 → ${size} 强，${size - n} 人轮空直进下一轮` : `${n} 人正好打满，无轮空`
+    };
+  }
+
+  if (mode === 'LEAGUE' || mode === 'ROUND') {
+    if (!hasData) return { rounds: '—', matches: '—', days: '—', note: '按 12 队估算：11 轮 66 场' };
+    const rounds = n - 1;
+    const matches = (n * (n - 1)) / 2;
+    return {
+      rounds,
+      matches,
+      days: Math.max(1, Math.ceil(rounds / 2)),
+      note: `${n} 队单循环；若开主客场双循环则翻倍（${matches * 2} 场 / ${rounds * 2} 轮）`
+    };
+  }
+
+  // GROUP_KO
+  if (!hasData) return { rounds: '—', matches: '—', days: '—', note: '按 16 队分 4 组估算' };
+  const g = Math.min(itemForm.group_count || 4, n);
+  const per = Math.ceil(n / g);
+  const groupRounds = itemForm.rounds_per_group || per - 1;
+  const groupMatches = g * (per * (per - 1) / 2);
+  const koSize = 2 ** Math.ceil(Math.log2(Math.max(2, itemForm.advance_count || 4)));
+  const koMatches = koSize - 1 + (itemForm.has_third_place ? 1 : 0);
+  return {
+    rounds: groupRounds,
+    matches: groupMatches + koMatches,
+    days: Math.max(1, Math.ceil((groupMatches + koMatches) / 8)),
+    note: `${n} 队分 ${g} 组，每组约 ${groupRounds} 轮；出线 ${itemForm.advance_count} 人打 ${koMatches} 场淘汰赛`
+  };
+});
+
 const bandForm = reactive({
   id: null, stage: 1, gender: 1, label: '', sort_no: 0,
   team_max_total_count: null, team_max_male_count: null, team_max_female_count: null,
@@ -522,11 +729,11 @@ const bandForm = reactive({
 const venueForm = reactive({ id: null, name: '', venue_no: 1, host_school_id: null });
 
 function categoryLabel(v) {
-  return { 1: '径赛', 2: '田赛', 3: '球类' }[v] || '其他';
+  return { 1: '径赛', 2: '田赛', 3: '球类', 4: '武术' }[v] || '其他';
 }
 
 function categoryType(v) {
-  return { 1: 'warning', 2: 'success', 3: 'primary' }[v] || 'default';
+  return { 1: 'warning', 2: 'success', 3: 'primary', 4: 'danger' }[v] || 'default';
 }
 
 function pairingLabel(v) {
@@ -592,6 +799,24 @@ async function loadSchools() {
 
 async function loadAll() {
   await Promise.all([loadItems(), loadBands(), loadVenues()]);
+  loadEntryCount();
+}
+
+/**
+ * 已报名队伍数（用于赛制规模预估）
+ */
+const teamsCount = ref(0);
+async function loadEntryCount() {
+  try {
+    const rows = await http.get('/entry/list', {
+      params: { competition_id: store.competitionId }
+    });
+    const list = Array.isArray(rows) ? rows : [];
+    // 只算审核通过的
+    teamsCount.value = list.filter((r) => Number(r.status) === 2).length;
+  } catch (e) {
+    teamsCount.value = 0;
+  }
 }
 
 function openItemCreate() {
@@ -608,6 +833,12 @@ function openItemCreate() {
   itemForm.has_third_place = 1;
   itemForm.schedule_mode = 'GROUP_KO';
   itemForm.participant_kind = 'TEAM';
+  itemForm.allow_draw = 0;
+  itemForm.win_points = 3;
+  itemForm.draw_points = 1;
+  itemForm.martial_judge_count = 5;
+  itemForm.martial_drop_highest = 1;
+  itemForm.martial_minutes = 90;
   itemForm.lane_count = 8;
   itemForm.prelim_max = 16;
   resetTrackFields();
@@ -724,6 +955,12 @@ function openItemEdit(row) {
   itemForm.has_third_place = row.has_third_place ?? 1;
   itemForm.schedule_mode = row.schedule_mode || 'GROUP_KO';
   itemForm.participant_kind = row.participant_kind || 'TEAM';
+  itemForm.allow_draw = row.allow_draw ?? 0;
+  itemForm.win_points = row.win_points ?? 3;
+  itemForm.draw_points = row.draw_points ?? 1;
+  itemForm.martial_judge_count = row.martial_judge_count ?? 5;
+  itemForm.martial_drop_highest = row.martial_drop_highest ?? 1;
+  itemForm.martial_minutes = row.martial_minutes ?? 90;
   itemForm.lane_count = row.lane_count ?? 8;
   itemForm.prelim_max = row.prelim_max ?? 16;
   // 田径参数
@@ -765,11 +1002,14 @@ async function submitItem() {
       has_third_place: itemForm.has_third_place,
       schedule_mode: itemForm.schedule_mode || 'GROUP_KO',
       participant_kind: itemForm.participant_kind || 'TEAM',
+      allow_draw: itemForm.allow_draw ? 1 : 0,
+      win_points: itemForm.win_points ?? 3,
+      draw_points: itemForm.draw_points ?? 0,
       lane_count: itemForm.lane_count,
       prelim_max: itemForm.prelim_max
     };
     // 径赛/田赛追加田径参数
-    if (itemForm.category !== 3) {
+    if (itemForm.category === 1 || itemForm.category === 2) {
       Object.assign(payload, {
         event_type: itemForm.event_type,
         result_entry_type: itemForm.result_entry_type,
@@ -785,6 +1025,14 @@ async function submitItem() {
         extra_qualifier_count: itemForm.extra_qualifier_count,
         team_score_multiplier: itemForm.team_score_multiplier,
         estimated_unit_minutes: itemForm.estimated_unit_minutes
+      });
+    }
+    // 武术追加评分制参数
+    if (itemForm.category === 4) {
+      Object.assign(payload, {
+        martial_judge_count: itemForm.martial_judge_count ?? 5,
+        martial_drop_highest: itemForm.martial_drop_highest ? 1 : 0,
+        martial_minutes: itemForm.martial_minutes ?? 90
       });
     }
     if (itemForm.id) {
@@ -993,6 +1241,105 @@ watch(() => store.competitionId, loadAll);
 <style scoped>
 .setup-card {
   border-radius: 8px;
+}
+
+/* ---------- 赛制模板选择器 ---------- */
+.mode-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .mode-picker { grid-template-columns: 1fr; }
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+  font-family: inherit;
+}
+.mode-card:hover {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--shadow-1);
+}
+.mode-card.on {
+  border-color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  box-shadow: inset 0 0 0 1px var(--td-brand-color);
+}
+
+.mc-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--app-text-1);
+}
+.mode-card.on .mc-name { color: var(--td-brand-color); }
+
+.mc-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--app-text-2);
+}
+
+.mc-flow {
+  font-size: 11px;
+  color: var(--app-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.mode-card.on .mc-flow { color: var(--td-brand-color); opacity: .8; }
+
+/* ---------- 规模预估 ---------- */
+.mode-preview {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-m);
+  background: var(--app-surface-3);
+  border: 1px solid var(--app-border-2);
+}
+.mp-item { display: flex; align-items: baseline; gap: 5px; }
+.mp-n {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--td-brand-color);
+  font-variant-numeric: tabular-nums;
+}
+.mp-l { font-size: 12px; color: var(--app-text-2); }
+.mp-note { font-size: 11.5px; color: var(--app-text-3); flex: 1; min-width: 180px; }
+
+/* ---------- 积分规则 ---------- */
+.points-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.pr-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.pr-label { font-size: 13px; color: var(--app-text-2); }
+.pr-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--app-text-3);
 }
 
 .setup-tabs :deep(.t-tabs__header) {

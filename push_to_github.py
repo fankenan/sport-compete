@@ -9,6 +9,24 @@ import sys
 import time
 import paramiko
 
+# ---- 凭据从环境变量读取（不要写死在代码里）----
+# 必填：SPORT_SSH_PASSWORD
+# 选填：SPORT_SSH_HOST / SPORT_SSH_USER / SPORT_SUDO_PASSWORD / SPORT_DB_PASSWORD
+_ENV = os.environ.copy()
+_ENV['SPORT_SSH_HOST'] = os.environ.get('SPORT_SSH_HOST', '10.128.1.45')
+_ENV['SPORT_SSH_USER'] = os.environ.get('SPORT_SSH_USER', 'single')
+_ENV['SPORT_SSH_PASSWORD'] = os.environ.get('SPORT_SSH_PASSWORD', '')
+_ENV['SPORT_SUDO_PASSWORD'] = os.environ.get('SPORT_SUDO_PASSWORD', '')
+_ENV['SPORT_DB_PASSWORD'] = os.environ.get('SPORT_DB_PASSWORD', '')
+
+if not _ENV['SPORT_SSH_PASSWORD']:
+    raise SystemExit(
+        '[安全] 缺少环境变量 SPORT_SSH_PASSWORD。\n'
+        '  本脚本会连接真实服务器，凭据不再写在代码里。\n'
+        '  请先 export SPORT_SSH_PASSWORD=... 后重试。'
+    )
+
+
 PAT = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('GH_PAT')
 if not PAT:
     raise SystemExit('缺少 PAT：python push_to_github.py <token>')
@@ -20,11 +38,11 @@ REMOTE_BUNDLE = 'sport-compete.bundle'
 
 cli = paramiko.SSHClient()
 cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-cli.connect('10.128.1.45', 22, 'single', 'jyj2026', timeout=20)
+cli.connect(_ENV['SPORT_SSH_HOST'], 22, _ENV['SPORT_SSH_USER'], _ENV['SPORT_SSH_PASSWORD'], timeout=20)
 
 
 def run(cmd, t=600, show=True):
-    _, o, e = cli.exec_command(cmd, timeout=t)
+    _, o, e = cli.exec_command(cmd, timeout=t, env=_ENV)
     out = o.read().decode('utf-8', 'replace').strip()
     err = e.read().decode('utf-8', 'replace').strip()
     if show and (out or err):

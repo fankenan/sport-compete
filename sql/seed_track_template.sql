@@ -1,6 +1,6 @@
 -- ============================================================
 -- 种子：内置田径项目模板 + 全能评分公式（国际田联标准公式）
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < seed_track_template.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < seed_track_template.sql
 -- 说明：先执行 migrate_track_phase1.sql
 -- ============================================================
 

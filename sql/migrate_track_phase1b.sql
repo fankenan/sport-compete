@@ -1,5 +1,5 @@
 -- 补漏：event_template 缺 admission_count / scoring_scheme / scoring_scheme_custom
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < migrate_track_phase1b.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < migrate_track_phase1b.sql
 
 SET NAMES utf8mb4;
 

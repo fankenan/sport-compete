@@ -496,6 +496,8 @@ watch(onlyMine, () => {
 }
 
 .panel-head {
+  width: 100%;
+  gap: var(--sp-3);
   display: flex;
   align-items: center;
   justify-content: space-between;

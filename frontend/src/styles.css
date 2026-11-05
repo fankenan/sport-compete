@@ -5,38 +5,48 @@
 
 /* ---------- 1. 令牌：亮色 ---------- */
 :root {
-  /* 品牌（沿用 TDesign 默认蓝，可通过此一处换肤） */
-  --td-brand-color: #0052d9;
-  --td-brand-color-hover: #366ef4;
-  --td-brand-color-active: #0034b5;
-  --td-brand-color-light: #f2f3ff;
+  /* 品牌色阶（补全，避免各处硬编码淡品牌底） */
+  --td-brand-color: #2563eb;
+  --td-brand-color-hover: #3b82f6;
+  --td-brand-color-active: #1d4ed8;
+  --td-brand-color-light: #eff4ff;
+  --td-brand-color-focus: #dbe6ff;
+  --td-brand-color-border: #c7d9fe;
+  --td-brand-color-light-2: #f6f8ff;
 
   /* 功能色 */
-  --app-success: #2ba471;
-  --app-warning: #ed7b2f;
-  --app-error: #d54941;
+  --app-success: #059669;
+  --app-success-light: #e8f6f0;
+  --app-warning: #d97706;
+  --app-warning-light: #fef3e6;
+  --app-error: #dc2626;
+  --app-error-light: #fdecec;
 
-  /* 中性面 */
-  --app-bg: #f5f6f8;            /* 页面底 */
-  --app-bg-2: #f7f8fa;          /* 次级底（表头/工具条/hover） */
+  /* 中性面（冷灰阶，拉开层次） */
+  --app-bg: #f6f7f9;            /* 页面底 */
+  --app-bg-2: #f1f3f7;          /* 次级底（表头/工具条/hover） */
   --app-surface: #ffffff;       /* 卡片面 */
-  --app-surface-2: #fbfcfd;     /* 卡片内嵌块 */
-  --app-sidebar-bg: #1c2536;
-  --app-sidebar-bg-2: #161d2b;
+  --app-surface-2: #fafbfc;     /* 卡片内嵌块 */
+  --app-surface-3: #f4f6f9;     /* 卡片内分组底 */
+  --app-sidebar-bg: #101725;
+  --app-sidebar-bg-2: #0b111c;
 
   /* 中性线 */
-  --app-border: #e7e7e7;        /* 主分割 */
-  --app-border-2: #f0f0f0;      /* 弱分割（行分隔） */
+  --app-border: #e4e8ef;        /* 主分割 */
+  --app-border-2: #eef1f5;      /* 弱分割（行分隔） */
+  --app-border-strong: #d5dbe5; /* 强分割（hover/选中） */
 
-  /* 中性字 */
-  --app-text-1: rgba(0, 0, 0, 0.9);
-  --app-text-2: rgba(0, 0, 0, 0.6);
-  --app-text-3: rgba(0, 0, 0, 0.42);
+  /* 中性字（实色冷灰，替代 rgba 黑） */
+  --app-text-1: #0f172a;
+  --app-text-2: #475569;
+  --app-text-3: #8a94a6;
   --app-text-inverse: #ffffff;
 
-  /* 阴影（两档） */
-  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --shadow-2: 0 4px 16px rgba(16, 24, 40, 0.1);
+  /* 阴影（三档，负偏移让卡片"浮"起来） */
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 1px 2px rgba(15, 23, 42, 0.04),
+              0 6px 16px -4px rgba(15, 23, 42, 0.1);
+  --shadow-3: 0 12px 32px -8px rgba(15, 23, 42, 0.22);
   --shadow-1-dark: 0 1px 2px rgba(0, 0, 0, 0.4);
 
   /* 字号阶梯（只允许这些档位） */
@@ -45,19 +55,26 @@
   --fs-12: 12px;  /* 次要正文/标签 */
   --fs-13: 13px;  /* 正文-表格 */
   --fs-14: 14px;  /* 正文 */
+  --fs-15: 15px;  /* 小标题 */
   --fs-16: 16px;  /* 卡片标题 */
+  --fs-18: 18px;  /* 区块标题 */
   --fs-20: 20px;  /* 页面标题 */
+  --fs-22: 22px;  /* 大标题 */
   --fs-26: 26px;  /* 指标数字 */
   --fs-34: 34px;  /* 大屏数字 */
 
   /* 圆角 */
-  --radius-s: 4px;
-  --radius-m: 6px;
-  --radius-l: 10px;
+  --radius-xs: 2px;
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-l: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
 
   /* 间距（4px 基准网格） */
-  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
-  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
+  --sp-5: 20px;  --sp-6: 24px;  --sp-7: 28px;  --sp-8: 32px;
+  --sp-10: 40px; --sp-12: 48px;
 
   /* 动效 */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -67,22 +84,40 @@
 
 /* ---------- 2. 令牌：暗色 ---------- */
 [theme-mode="dark"] {
-  --app-bg: #11151c;
-  --app-bg-2: #191f29;
-  --app-surface: #1b222e;
-  --app-surface-2: #212936;
-  --app-sidebar-bg: #151a23;
-  --app-sidebar-bg-2: #10141b;
+  --td-brand-color: #3b82f6;
+  --td-brand-color-hover: #60a5fa;
+  --td-brand-color-active: #2563eb;
+  --td-brand-color-light: #17243d;
+  --td-brand-color-focus: #1d3053;
+  --td-brand-color-border: #294064;
 
-  --app-border: #2e3644;
-  --app-border-2: #262d39;
+  --app-success: #10b981;
+  --app-success-light: #10281f;
+  --app-warning: #f59e0b;
+  --app-warning-light: #2a1f0d;
+  --app-error: #ef4444;
+  --app-error-light: #2c1414;
 
-  --app-text-1: rgba(255, 255, 255, 0.9);
-  --app-text-2: rgba(255, 255, 255, 0.6);
-  --app-text-3: rgba(255, 255, 255, 0.4);
+  --app-bg: #0e1219;
+  --app-bg-2: #151b25;
+  --app-surface: #181f2b;
+  --app-surface-2: #1d2532;
+  --app-surface-3: #212a38;
+  --app-sidebar-bg: #0b1017;
+  --app-sidebar-bg-2: #070b10;
 
-  --shadow-1: var(--shadow-1-dark);
-  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --app-border: #262f3d;
+  --app-border-2: #1f2632;
+  --app-border-strong: #364152;
+
+  --app-text-1: #e8edf5;
+  --app-text-2: #9aa6b8;
+  --app-text-3: #6b7788;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.35),
+              0 6px 16px -4px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 12px 32px -8px rgba(0, 0, 0, 0.7);
 }
 
 /* ---------- 3. 基础 ---------- */
@@ -134,19 +169,20 @@ body {
   transition: background var(--dur-fast) ease;
 }
 
-/* ---------- 6. 卡片：去灰边，用浅阴影分层 ---------- */
+/* ---------- 6. 卡片：1px 边框 + 浅阴影分层 ---------- */
 .t-card {
   border-radius: var(--radius-l);
-  border: none;
+  border: 1px solid var(--app-border);
   box-shadow: var(--shadow-1);
   transition: box-shadow var(--dur-mid) var(--ease-out),
-    transform var(--dur-mid) var(--ease-out);
+    border-color var(--dur-mid) var(--ease-out);
   background: var(--app-surface);
 }
 
 .t-card--hover:hover {
   box-shadow: var(--shadow-2);
-  transform: translateY(-2px);
+  border-color: var(--app-border-strong);
+  transform: translateY(-1px);
 }
 
 /* ---------- 7. 路由切换动画 ---------- */
@@ -245,7 +281,122 @@ body {
   overflow-x: auto;
 }
 
-/* ---------- 选项卡：导航与面板内容的呼吸感（全站 9 个 tabs 页统一生效） ---------- */
+/* ---------- 12. 页面骨架：统一容器 / 页头 / 图表色调 ---------- */
+/* 页面容器：带最大宽度，避免 1920 宽屏上无限拉伸显松散 */
+.page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-1);
+}
+
+.page-title {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--app-text-1);
+}
+
+.page-desc {
+  margin: 3px 0 0;
+  font-size: var(--fs-13);
+  color: var(--app-text-2);
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* 指标卡 / 图标色调：替代各页内联的浅色渐变硬编码（暗色模式下不再翻车） */
+.icon-tone {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.icon-tone.tone-blue   { background: #eff4ff; color: #1d4ed8; }
+.icon-tone.tone-green  { background: #e8f6f0; color: #047857; }
+.icon-tone.tone-orange { background: #fef2e8; color: #b45309; }
+.icon-tone.tone-violet { background: #f3eefe; color: #6d28d9; }
+.icon-tone.tone-red    { background: #fdecec; color: #b91c1c; }
+.icon-tone.tone-slate  { background: #eef1f5; color: #475569; }
+[theme-mode="dark"] .icon-tone.tone-blue   { background: #17243d; color: #93b4fb; }
+[theme-mode="dark"] .icon-tone.tone-green  { background: #10281f; color: #5cd3a3; }
+[theme-mode="dark"] .icon-tone.tone-orange { background: #2a1f0d; color: #f5b755; }
+[theme-mode="dark"] .icon-tone.tone-violet { background: #221a38; color: #bda4f5; }
+[theme-mode="dark"] .icon-tone.tone-red    { background: #2c1414; color: #f79191; }
+[theme-mode="dark"] .icon-tone.tone-slate  { background: #212a38; color: #9aa6b8; }
+
+/* 语义色药丸（替代各处硬编码的浅色底 + 深色字） */
+.pill-success {
+  background: var(--app-success-light);
+  color: var(--app-success);
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-11);
+}
+.pill-warning {
+  background: var(--app-warning-light);
+  color: var(--app-warning);
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-11);
+}
+.pill-error {
+  background: var(--app-error-light);
+  color: var(--app-error);
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-11);
+}
+
+/* ---------- 13. 深墨蓝 Hero ----------
+   深色 Hero 在浅色工作台里形成明确的主次分区；
+   细网格纹理替代空洞的装饰圆；左侧 3px 强调条与面包屑方向一致。 */
+.hero-dark {
+  position: relative;
+  border-radius: var(--radius-xl);
+  padding: var(--sp-5) var(--sp-6);
+  color: #fff;
+  overflow: hidden;
+  background:
+    linear-gradient(0deg,  rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 100% 22px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px) 0 0 / 22px 100%,
+    linear-gradient(135deg, #0b1220 0%, #10233f 55%, #14356b 100%);
+  box-shadow: var(--shadow-3);
+}
+
+.hero-dark::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #60a5fa, #2563eb);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+}
+
+.hero-dark > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 13. 选项卡：导航与面板内容的呼吸感（全站 9 个 tabs 页统一生效） ---------- */
 .t-tabs .t-tabs__content {
   padding-top: 16px;
 }
@@ -275,12 +426,15 @@ body {
   color: var(--app-text-3);
 }
 
-/* 内容区页面级入场动画（配合路由 fade-slide） */
-.content > * {
+/* 内容区页面级入场动画
+   注意：作用对象是 .content-inner 的直接子元素（即真正的页面组件），
+   不能是 .content > * —— 那会作用到包裹层 .content-inner 本身，
+   与路由切换动画叠加，出现两个页面重叠共存的问题。 */
+.content-inner > * {
   animation: rise-in 0.35s var(--ease-out) backwards;
 }
 
-/* ---------- 12. 滚动条 ---------- */
+/* ---------- 14. 滚动条 ---------- */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

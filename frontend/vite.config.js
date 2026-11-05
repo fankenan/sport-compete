@@ -1,17 +1,22 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import { mockApiPlugin } from './mock/plugin';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), mockApiPlugin()],
   server: {
     host: '0.0.0.0',
     port: 3100,
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:4100',
-        changeOrigin: true
+    // 默认走本地 Mock（无 MySQL 也能看界面）。
+    // 要连真实后端时：VITE_MOCK=0 npm run dev
+    proxy: process.env.VITE_MOCK === '0'
+      ? {
+        '/api': {
+          target: 'http://127.0.0.1:4100',
+          changeOrigin: true
+        }
       }
-    }
+      : undefined
   },
   build: {
     outDir: 'dist',

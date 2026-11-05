@@ -4,11 +4,29 @@ import os
 import json
 import paramiko
 
-HOST, USER, PWD = '10.128.1.45', 'single', 'jyj2026'
+HOST = _ENV['SPORT_SSH_HOST']
+USER = _ENV['SPORT_SSH_USER']
+PWD  = _ENV['SPORT_SSH_PASSWORD']
 cli = paramiko.SSHClient()
 cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 cli.connect(HOST, 22, USER, PWD, timeout=15)
 
+
+
+def _env(name, fallback=None):
+    """读环境变量；未设置时返回 fallback（可为 None 表示必须显式配置）"""
+    return os.environ.get(name, fallback)
+
+
+def _require_env(name):
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(
+            '[安全] 缺少环境变量 %s。\n'
+            '  本脚本会连接真实服务器/数据库，凭据不再写在代码里。\n'
+            '  请先设置环境变量后重试。' % name
+        )
+    return v
 
 def run(cmd, t=180):
     _, o, e = cli.exec_command(cmd, timeout=t)
@@ -17,7 +35,7 @@ def run(cmd, t=180):
 
 def mq(sql):
     """执行 mysql 并返回结果文本"""
-    o, e = run(f"""mysql -ucompete -p'Compete@2026' sport_compete -N -e "{sql}" 2>&1 | grep -v Warning""")
+    o, e = run(f"""mysql -ucompete -pprocess.env.SPORT_DB_PASSWORD sport_compete -N -e "{sql}" 2>&1 | grep -v Warning""")
     return o or e
 
 
@@ -97,7 +115,7 @@ SELECT @cid, @bid, a.id, @e2, 2 FROM athlete a WHERE a.name IN ('P3-替补A','P3
 
 SELECT CONCAT('cid=', @cid, ' bid=', @bid, ' e1=', @e1, ' e2=', @e2, ' e3=', @e3);
 """
-o, e = run(f"""mysql -ucompete -p'Compete@2026' sport_compete -e "{setup}" 2>&1 | grep -v Warning""")
+o, e = run(f"""mysql -ucompete -pprocess.env.SPORT_DB_PASSWORD sport_compete -e "{setup}" 2>&1 | grep -v Warning""")
 print(o or e)
 
 ids = mq("""SELECT CONCAT(c.id,'|',b.id,'|',e1.id,'|',e2.id,'|',e3.id)
@@ -410,7 +428,7 @@ DELETE FROM competition WHERE name='P3测试赛';
 DELETE FROM athlete WHERE name LIKE 'P3-%';
 SELECT 'cleaned';
 """
-o, e = run(f"""mysql -ucompete -p'Compete@2026' sport_compete -e "{clean}" 2>&1 | grep -v Warning""")
+o, e = run(f"""mysql -ucompete -pprocess.env.SPORT_DB_PASSWORD sport_compete -e "{clean}" 2>&1 | grep -v Warning""")
 print(o or e)
 
 print('\n================ 汇总 ================')

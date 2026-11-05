@@ -3,6 +3,7 @@ const { query, queryOne, execute, ok, fail, transaction } = require('../db');
 const { authRequired, roleRequired } = require('../middleware/auth');
 const scoreEngine = require('../services/scoreEngine');
 const arrange = require('../services/trackArrange');
+const announcement = require('../services/announcement');
 
 const router = express.Router();
 router.use(authRequired);
@@ -14,8 +15,8 @@ const ROUND_NO = { PRELIM: 1, SEMI: 2, FINAL: 3 };
 // 一、编排规则
 // ============================================================
 
-/** GET /api/track-result/arrange-rule?event_item_id=&band_id= */
-router.get('/arrange-rule', async (req, res, next) => {
+/** GET /api/track-result/group-arrange-rule?event_item_id=&band_id= */
+router.get('/group-arrange-rule', async (req, res, next) => {
   try {
     const { event_item_id, band_id } = req.query;
     let r = await queryOne(
@@ -32,8 +33,8 @@ router.get('/arrange-rule', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/** PUT /api/track-result/arrange-rule */
-router.put('/arrange-rule', roleRequired(1, 3), async (req, res, next) => {
+/** PUT /api/track-result/group-arrange-rule */
+router.put('/group-arrange-rule', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
     if (!b.event_item_id) return res.json(fail('缺少项目 id'));
@@ -73,11 +74,11 @@ router.put('/arrange-rule', roleRequired(1, 3), async (req, res, next) => {
 // ============================================================
 
 /**
- * POST /api/track-result/arrange
+ * POST /api/track-result/group-arrange
  * body: { competition_id, event_item_id, band_id, round_code }
  * 从 athlete_entry 取报名名单，按规则切组、排道次，写入 track_heat + heat_entry
  */
-router.post('/arrange', roleRequired(1, 3), async (req, res, next) => {
+router.post('/group-arrange', roleRequired(1), async (req, res, next) => {
   try {
     const { competition_id, event_item_id, band_id, round_code = 'FINAL' } = req.body;
     if (!competition_id || !event_item_id || !band_id) return res.json(fail('参数不完整'));
@@ -159,11 +160,11 @@ router.post('/arrange', roleRequired(1, 3), async (req, res, next) => {
 });
 
 /**
- * PUT /api/track-result/arrange/adjust
+ * PUT /api/track-result/group-arrange/adjust
  * body: { heat_id, entries: [{ id, lane_no, sort_no }] }
  * 手工调整道次 / 出场顺序
  */
-router.put('/arrange/adjust', roleRequired(1, 3), async (req, res, next) => {
+router.put('/group-arrange/adjust', roleRequired(1), async (req, res, next) => {
   try {
     const { heat_id, entries } = req.body;
     if (!heat_id || !Array.isArray(entries)) return res.json(fail('参数不完整'));
@@ -179,11 +180,11 @@ router.put('/arrange/adjust', roleRequired(1, 3), async (req, res, next) => {
 });
 
 /**
- * PUT /api/track-result/arrange/move
+ * PUT /api/track-result/group-arrange/move
  * body: { entry_id, target_heat_id }
  * 把某人挪到另一组
  */
-router.put('/arrange/move', roleRequired(1, 3), async (req, res, next) => {
+router.put('/group-arrange/move', roleRequired(1), async (req, res, next) => {
   try {
     const { entry_id, target_heat_id } = req.body;
     const ent = await queryOne('SELECT * FROM heat_entry WHERE id = ?', [entry_id]);
@@ -309,7 +310,7 @@ router.get('/heat/:id', async (req, res, next) => {
  * POST /api/track-result/save
  * body: { heat_id, entries: [{ id, result_text, status_code, manual_rank_flag, rank_no, remark }] }
  */
-router.post('/save', roleRequired(1, 3), async (req, res, next) => {
+router.post('/save', roleRequired(1), async (req, res, next) => {
   try {
     const { heat_id, entries } = req.body;
     if (!heat_id || !Array.isArray(entries)) return res.json(fail('参数不完整'));
@@ -423,19 +424,39 @@ async function recalcCombinedScore(ev, entries) {
 }
 
 /** POST /api/track-result/confirm 确认一组成绩 */
-router.post('/confirm', roleRequired(1, 3), async (req, res, next) => {
+router.post('/confirm', roleRequired(1), async (req, res, next) => {
   try {
     const { heat_id } = req.body;
+    const heat = await queryOne(
+      'SELECT id, competition_id FROM track_heat WHERE id = ?', [heat_id]
+    );
+    if (!heat) return res.json(fail('赛次不存在'));
+
+    const who = req.user.real_name || req.user.username;
     await execute(
       'UPDATE track_heat SET confirm_flag = 1, status = 4, confirmed_at = NOW(), confirmed_by = ? WHERE id = ?',
-      [req.user.real_name || req.user.username, heat_id]
+      [who, heat_id]
     );
-    res.json(ok(null, '成绩已确认'));
+
+    // 【实现 announce_auto_flag】
+    // 原来 competition.announce_auto_flag（"确认后自动公布"）只写不读 ——
+    // 配了这个开关系统什么也不会做。现在确认成绩后按开关自动公布。
+    let auto = null;
+    try {
+      auto = await announcement.autoPublishIfEnabled(heat.competition_id, [heat_id], who);
+    } catch (e) {
+      console.error('[自动公布失败]', e.message);
+    }
+
+    const msg = auto?.auto
+      ? `成绩已确认，已自动公布（${auto.count} 个赛次）`
+      : '成绩已确认';
+    res.json(ok({ auto_published: !!auto?.auto, count: auto?.count || 0 }, msg));
   } catch (e) { next(e); }
 });
 
 /** POST /api/track-result/revoke 撤销确认 */
-router.post('/revoke', roleRequired(1, 3), async (req, res, next) => {
+router.post('/revoke', roleRequired(1), async (req, res, next) => {
   try {
     const { heat_id } = req.body;
     await execute(
@@ -447,7 +468,7 @@ router.post('/revoke', roleRequired(1, 3), async (req, res, next) => {
 });
 
 /** DELETE /api/track-result/clear/:heatId 清空一组成绩 */
-router.delete('/clear/:heatId', roleRequired(1, 3), async (req, res, next) => {
+router.delete('/clear/:heatId', roleRequired(1), async (req, res, next) => {
   try {
     const heatId = req.params.heatId;
     const heat = await queryOne('SELECT * FROM track_heat WHERE id = ?', [heatId]);
@@ -488,7 +509,7 @@ router.get('/attempts/:entryId', async (req, res, next) => {
  * body: { attempts: [{ attempt_no, phase, result_text, valid_flag, symbol, height }] }
  * 保存后自动取本人最好一次回写到 heat_entry
  */
-router.put('/attempts/:entryId', roleRequired(1, 3), async (req, res, next) => {
+router.put('/attempts/:entryId', roleRequired(1), async (req, res, next) => {
   try {
     const entryId = req.params.entryId;
     const ent = await queryOne('SELECT * FROM heat_entry WHERE id = ?', [entryId]);
@@ -565,7 +586,7 @@ router.get('/advancement-rule', async (req, res, next) => {
 });
 
 /** PUT /api/track-result/advancement-rule */
-router.put('/advancement-rule', roleRequired(1, 3), async (req, res, next) => {
+router.put('/advancement-rule', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
     if (!b.event_item_id) return res.json(fail('缺少项目 id'));
@@ -605,7 +626,7 @@ router.put('/advancement-rule', roleRequired(1, 3), async (req, res, next) => {
  * body: { competition_id, event_item_id, band_id, from_round, to_round, to_heat_count }
  * 按规则挑人，生成下一轮分组
  */
-router.post('/advancement/generate', roleRequired(1, 3), async (req, res, next) => {
+router.post('/advancement/generate', roleRequired(1), async (req, res, next) => {
   try {
     const { competition_id, event_item_id, band_id, from_round = 'PRELIM', to_round = 'FINAL', to_heat_count } = req.body;
     if (!competition_id || !event_item_id || !band_id) return res.json(fail('参数不完整'));
@@ -734,13 +755,34 @@ router.get('/relay/candidates', async (req, res, next) => {
 });
 
 /** PUT /api/track-result/relay/:entryId */
-router.put('/relay/:entryId', roleRequired(1, 2, 3), async (req, res, next) => {
+router.put('/relay/:entryId', roleRequired(1, 2), async (req, res, next) => {
   try {
     const entryId = req.params.entryId;
     const legs = req.body.legs || [];
+
+    // 【越权修复】原来 roleRequired(1,2,3) 且**没有归属校验**，
+    // 学校账号可以改任意学校任意接力棒的棒次。现在：
+    //   非管理员只能改本校的赛次，且棒次运动员必须来自本校
+    if (req.user.role !== 1) {
+      const own = await queryOne(
+        'SELECT id FROM heat_entry WHERE id = ? AND school_id = ?',
+        [entryId, req.user.school_id]
+      );
+      if (!own) {
+        return res.json(fail('无权修改其他学校的接力棒次'));
+      }
+    }
+
     await execute('DELETE FROM relay_lineup WHERE heat_entry_id = ?', [entryId]);
     for (const l of legs) {
       if (!l.athlete_id) continue;
+      // 棒次运动员必须属于本校
+      if (req.user.role !== 1) {
+        const a = await queryOne('SELECT school_id FROM athlete WHERE id = ?', [l.athlete_id]);
+        if (!a || Number(a.school_id) !== Number(req.user.school_id)) {
+          return res.json(fail('棒次运动员必须来自本校'));
+        }
+      }
       await execute(
         'INSERT INTO relay_lineup (heat_entry_id, leg_no, athlete_id, athlete_name, bib_no, is_temporary) VALUES (?,?,?,?,?,?)',
         [entryId, l.leg_no, l.athlete_id, l.athlete_name || null, l.bib_no || null, l.is_temporary ? 1 : 0]
@@ -778,7 +820,7 @@ router.get('/combined', async (req, res, next) => {
  * body: { competition_id, event_item_id, band_id }
  * 重算全能总分
  */
-router.post('/combined/recalc', roleRequired(1, 3), async (req, res, next) => {
+router.post('/combined/recalc', roleRequired(1), async (req, res, next) => {
   try {
     const { competition_id, event_item_id, band_id } = req.body;
     const parent = await queryOne('SELECT * FROM event_item WHERE id = ?', [event_item_id]);

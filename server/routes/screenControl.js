@@ -40,7 +40,7 @@ router.get('/config', async (req, res, next) => {
 });
 
 /** PUT /api/screen-control/config */
-router.put('/config', roleRequired(1, 3), async (req, res, next) => {
+router.put('/config', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
     if (!b.competition_id) return res.json(fail('缺少赛事 id'));
@@ -80,7 +80,7 @@ router.put('/config', roleRequired(1, 3), async (req, res, next) => {
 });
 
 /** POST /api/screen-control/insert 插播 */
-router.post('/insert', roleRequired(1, 3), async (req, res, next) => {
+router.post('/insert', roleRequired(1), async (req, res, next) => {
   try {
     const { competition_id, insert_text, minutes } = req.body;
     if (!insert_text) return res.json(fail('请填写插播内容'));
@@ -102,7 +102,7 @@ router.post('/insert', roleRequired(1, 3), async (req, res, next) => {
 });
 
 /** POST /api/screen-control/insert/clear 关闭插播 */
-router.post('/insert/clear', roleRequired(1, 3), async (req, res, next) => {
+router.post('/insert/clear', roleRequired(1), async (req, res, next) => {
   try {
     await execute(
       'UPDATE screen_config SET insert_flag=0, insert_text=NULL, insert_until=NULL WHERE competition_id=?',

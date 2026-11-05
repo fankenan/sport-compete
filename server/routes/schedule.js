@@ -4,6 +4,7 @@ const { authRequired, roleRequired } = require('../middleware/auth');
 const { bandLabel, addMinutes } = require('../utils/helpers');
 const scheduler = require('../services/scheduler');
 const ko = require('../services/schedule-ko');
+const ballTimeline = require('../services/ballTimeline');
 const { bergerByes } = require('../services/schedule-algorithms');
 
 const router = express.Router();
@@ -14,9 +15,9 @@ const STAGE_LABEL = {
 };
 
 /**
- * 项目赛制设置（主客场双循环 / 是否允许平局 / 积分规则）
+ * 项目赛制设置（赛制模式 / 主客场双循环 / 是否允许平局 / 积分规则）
  * GET  /api/schedule/event-config?event_item_id=1
- * POST /api/schedule/event-config  { event_item_id, home_away?, allow_draw?, win_points?, draw_points? }
+ * POST /api/schedule/event-config  { event_item_id, schedule_mode?, home_away?, allow_draw?, win_points?, draw_points? }
  *
  * home_away=1（主客场双循环）时：手动编排不再限制「同一对队伍重复对阵」，
  * 一键生成循环赛程时第二循环镜像第一循环并主客对调
@@ -26,32 +27,62 @@ router.get('/event-config', async (req, res, next) => {
     const { event_item_id } = req.query;
     if (!event_item_id) return res.json(fail('缺少项目参数'));
     const ev = await queryOne(
-      'SELECT id, name, home_away, allow_draw, win_points, draw_points FROM event_item WHERE id = ?',
+      `SELECT id, name, schedule_mode, participant_kind, home_away, allow_draw,
+              win_points, draw_points, group_count, rounds_per_group, advance_count,
+              pairing_rule, has_third_place, match_minutes, slot_interval
+       FROM event_item WHERE id = ?`,
       [event_item_id]
     );
     if (!ev) return res.json(fail('项目不存在'));
     res.json(ok({
       event_item_id: ev.id,
       name: ev.name,
+      schedule_mode: ev.schedule_mode || 'GROUP_KO',
+      participant_kind: ev.participant_kind || 'TEAM',
       home_away: Number(ev.home_away) === 1 ? 1 : 0,
       allow_draw: Number(ev.allow_draw) === 0 ? 0 : 1,
       win_points: Number(ev.win_points) || 3,
-      draw_points: Number(ev.draw_points) || 0
+      draw_points: Number(ev.draw_points) || 0,
+      group_count: Number(ev.group_count) || 0,
+      rounds_per_group: Number(ev.rounds_per_group) || 0,
+      advance_count: Number(ev.advance_count) || 4,
+      pairing_rule: Number(ev.pairing_rule) || 1,
+      has_third_place: Number(ev.has_third_place) === 1 ? 1 : 0,
+      match_minutes: Number(ev.match_minutes) || 24,
+      slot_interval: Number(ev.slot_interval) || 45
     }));
   } catch (e) { next(e); }
 });
 
 router.post('/event-config', roleRequired(1), async (req, res, next) => {
   try {
-    const { event_item_id, home_away, allow_draw, win_points, draw_points } = req.body;
+    const {
+      event_item_id, schedule_mode, home_away, allow_draw,
+      win_points, draw_points, group_count, rounds_per_group,
+      advance_count, pairing_rule, has_third_place
+    } = req.body;
     if (!event_item_id) return res.json(fail('缺少项目参数'));
 
     const sets = [];
     const params = [];
-    if (home_away !== undefined) { sets.push('home_away = ?'); params.push(Number(home_away) === 1 ? 1 : 0); }
-    if (allow_draw !== undefined) { sets.push('allow_draw = ?'); params.push(Number(allow_draw) === 0 ? 0 : 1); }
-    if (win_points !== undefined) { sets.push('win_points = ?'); params.push(Number(win_points) || 0); }
-    if (draw_points !== undefined) { sets.push('draw_points = ?'); params.push(Number(draw_points) || 0); }
+
+    const put = (col, val) => { sets.push(`${col} = ?`); params.push(val); };
+
+    if (schedule_mode !== undefined) {
+      const modes = ['GROUP_KO', 'KO', 'LEAGUE', 'ROUND'];
+      if (!modes.includes(schedule_mode)) return res.json(fail('赛制不合法'));
+      put('schedule_mode', schedule_mode);
+    }
+    if (home_away !== undefined) put('home_away', Number(home_away) === 1 ? 1 : 0);
+    if (allow_draw !== undefined) put('allow_draw', Number(allow_draw) === 0 ? 0 : 1);
+    if (win_points !== undefined) put('win_points', Math.max(0, Number(win_points) || 0));
+    if (draw_points !== undefined) put('draw_points', Math.max(0, Number(draw_points) || 0));
+    if (group_count !== undefined) put('group_count', Math.max(0, Number(group_count) || 0));
+    if (rounds_per_group !== undefined) put('rounds_per_group', Math.max(0, Number(rounds_per_group) || 0));
+    if (advance_count !== undefined) put('advance_count', Math.max(0, Number(advance_count) || 0));
+    if (pairing_rule !== undefined) put('pairing_rule', Math.max(1, Number(pairing_rule) || 1));
+    if (has_third_place !== undefined) put('has_third_place', Number(has_third_place) === 1 ? 1 : 0);
+
     if (sets.length === 0) return res.json(fail('没有要修改的项'));
 
     params.push(event_item_id);
@@ -192,8 +223,15 @@ router.get('/rounds', async (req, res, next) => {
 });
 
 /**
- * 生成时间槽
+ * 设置比赛日程（可用时间窗）
  * POST /api/schedule/slots
+ *
+ * 【语义变更】原来叫「生成时间槽」，生成的是**等距格子**（一格一场、时长写死 35 分钟），
+ * 导致 event_item.match_minutes 字段全后端零引用，且「生成时间槽」成了所有编排的前置门槛。
+ * 现在生成的是「**可用时间窗**」——当天各场地在哪些时段可以排比赛，
+ * 一场球可以在窗内取任意一段，时长按项目的 match_minutes 决定。
+ *
+ * 端点路径保持 /slots 不变（前端不用改 URL），但返回结构变了。
  */
 router.post('/slots', roleRequired(1), async (req, res, next) => {
   try {
@@ -201,45 +239,144 @@ router.post('/slots', roleRequired(1), async (req, res, next) => {
     if (!competition_id || !Array.isArray(playDates) || playDates.length === 0) {
       return res.json(fail('请选择比赛日期'));
     }
-    const slots = await scheduler.generateSlots(competition_id, playDates, {
+    const windows = await ballTimeline.generateWindows(competition_id, playDates, {
       slotInterval, amStart, pmStart, slotCount
     });
-    res.json(ok({ count: slots.length }, `已生成 ${slots.length} 个时间槽`));
+    res.json(ok({ count: windows.length }, `已设置 ${windows.length} 个可用时段`));
   } catch (e) { next(e); }
 });
 
 /**
- * 装箱排期
+ * 自动排期
  * POST /api/schedule/pack
+ *
+ * 现在走新的时间轴引擎：按「场地 × 时间窗」用分钟游标连续排，
+ * 每场时长按项目 match_minutes，支持小组赛与淘汰赛一起排。
  */
 router.post('/pack', roleRequired(1), async (req, res, next) => {
   try {
-    const { competition_id } = req.body;
-    const slotMap = await query(
-      `SELECT ss.*, v.venue_no, v.name AS venue_name FROM schedule_slot ss
-       JOIN venue v ON v.id = ss.venue_id
-       WHERE ss.competition_id = ? ORDER BY ss.play_date, v.venue_no, ss.slot_index`,
-      [competition_id]
+    const { competition_id, venue_id, play_date } = req.body;
+    if (!competition_id) return res.json(fail('缺少赛事参数'));
+
+    const result = await ballTimeline.autoArrange(competition_id, { venue_id, play_date });
+    const msg = `已排入 ${result.placed} 场`
+      + (result.unplaced ? `，${result.unplaced} 场没找到合适空档` : '')
+      + (result.waiting ? `，${result.waiting} 场等上一轮赛果确定对手` : '');
+    res.json(ok(result, msg));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 冲突检测
+ * GET /api/schedule/conflicts?competition_id=1
+ *
+ * 三类：VENUE 场地重叠 / TEAM 同一队伍同时两场 / REST 队伍休息不足
+ */
+router.get('/conflicts', async (req, res, next) => {
+  try {
+    const { competition_id } = req.query;
+    if (!competition_id) return res.json(fail('缺少赛事参数'));
+    const list = await ballTimeline.detectConflicts(competition_id);
+    res.json(ok({
+      total: list.length,
+      conflicts: list
+    }, list.length ? `发现 ${list.length} 处冲突` : '没有冲突'));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 清空排期（保留时间窗）
+ * POST /api/schedule/clear-schedule
+ */
+router.post('/clear-schedule', roleRequired(1), async (req, res, next) => {
+  try {
+    const { competition_id, play_date, venue_id } = req.body;
+    if (!competition_id) return res.json(fail('缺少赛事参数'));
+    const r = await ballTimeline.clearSchedule(competition_id, { play_date, venue_id });
+    res.json(ok(r, `已清空 ${r.cleared} 场的排期`));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 待排期场次
+ * GET /api/schedule/unplaced?competition_id=1&band_id=&event_item_id=
+ *
+ * 以前系统里没有任何地方能列出「还有哪些比赛没排期」——
+ * 淘汰赛（stage>=2）因为 packSchedule 只排 stage=1，管理员在甘特图上根本看不到它们，
+ * 只能凭记忆逐场手动新增。这个接口把缺口显式化。
+ */
+router.get('/unplaced', async (req, res, next) => {
+  try {
+    const { competition_id, band_id, event_item_id } = req.query;
+    if (!competition_id) return res.json(fail('缺少赛事参数'));
+
+    const where = ['m.competition_id = ?', 'm.slot_id IS NULL'];
+    const params = [competition_id];
+    if (band_id) { where.push('m.band_id = ?'); params.push(band_id); }
+    if (event_item_id) { where.push('m.event_item_id = ?'); params.push(event_item_id); }
+
+    const rows = await query(
+      `SELECT m.id, m.seq_no, m.stage, m.round_no, m.band_id, m.event_item_id,
+              m.team_a_id, m.team_b_id, m.ref_a, m.ref_b, m.status,
+              ta.team_name AS team_a_name, tb.team_name AS team_b_name,
+              ei.name AS event_name, gb.label AS band_label
+       FROM match_info m
+       LEFT JOIN team_entry ta ON ta.id = m.team_a_id
+       LEFT JOIN team_entry tb ON tb.id = m.team_b_id
+       JOIN event_item ei ON ei.id = m.event_item_id
+       JOIN group_band gb ON gb.id = m.band_id
+       WHERE ${where.join(' AND ')}
+       ORDER BY m.band_id, m.event_item_id, m.stage, m.round_no, m.seq_no`,
+      params
     );
-    if (slotMap.length === 0) return res.json(fail('请先生成时间槽'));
 
-    // 每天每场地的槽位数（用于区分上午/下午）
-    const firstDate = slotMap[0].play_date;
-    const firstVenue = slotMap[0].venue_id;
-    const slotsPerVenuePerDay = slotMap.filter(
-      (s) => s.play_date === firstDate && s.venue_id === firstVenue
-    ).length;
-    const halfThreshold = Math.ceil(slotsPerVenuePerDay / 2);
+    const STAGE_LABEL = {
+      1: '小组赛', 2: '八进四', 3: '半决赛', 4: '排位赛', 5: '决赛', 6: '三四名'
+    };
 
-    const mapped = slotMap.map((s) => ({
-      id: s.id, date: s.play_date, venue_id: s.venue_id, venue_no: s.venue_no,
-      slot_index: s.slot_index,
-      half: s.slot_index > halfThreshold ? 'PM' : 'AM',
-      start_time: (s.start_time || '').slice(0, 5), end_time: (s.end_time || '').slice(0, 5)
+    // 按「项目 + 阶段」汇总，让管理员一眼看到缺多少
+    const summary = new Map();
+    for (const r of rows) {
+      const key = `${r.band_id}|${r.event_item_id}|${r.stage}`;
+      if (!summary.has(key)) {
+        summary.set(key, {
+          band_id: r.band_id,
+          band_label: bandLabel(r),
+          event_item_id: r.event_item_id,
+          event_name: r.event_name,
+          stage: r.stage,
+          stage_label: STAGE_LABEL[r.stage] || `阶段${r.stage}`,
+          count: 0,
+          ready: 0
+        });
+      }
+      const s = summary.get(key);
+      s.count++;
+      // 双方都已确定才能排期（占位场次要等上一轮赛果）
+      if (r.team_a_id && r.team_b_id) s.ready++;
+    }
+
+    res.json(ok({
+      total: rows.length,
+      ready: rows.filter((r) => r.team_a_id && r.team_b_id).length,
+      pendingResult: rows.filter((r) => !r.team_a_id || !r.team_b_id).length,
+      summary: [...summary.values()],
+      matches: rows.map((r) => ({
+        id: r.id,
+        seq_no: r.seq_no,
+        stage: r.stage,
+        stage_label: STAGE_LABEL[r.stage] || `阶段${r.stage}`,
+        round_no: r.round_no,
+        band_id: r.band_id,
+        band_label: bandLabel(r),
+        event_item_id: r.event_item_id,
+        event_name: r.event_name,
+        team_a: r.team_a_name || r.ref_a || '待定',
+        team_b: r.team_b_name || r.ref_b || '待定',
+        ready: !!(r.team_a_id && r.team_b_id),
+        status: r.status
+      }))
     }));
-
-    const result = await scheduler.packSchedule(competition_id, mapped);
-    res.json(ok(result, `已排入 ${result.placed} 场${result.unplaced ? `，${result.unplaced} 场待人工安排` : ''}`));
   } catch (e) { next(e); }
 });
 
@@ -457,22 +594,35 @@ router.get('/bracket-all', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/**
+ * GET /api/schedule/gantt?competition_id=
+ *
+ * 【模型变更】原来返回的是「格子数组」：每个 schedule_slot 一格，
+ * 通过 slot_id 一对一挂一场比赛（`new Map(matches.map(m => [m.slot_id, m]))`）——
+ * 这就是"一格只能一场"的根源。
+ *
+ * 现在改为返回三层结构：
+ *   days     比赛日（来自可用时间窗）
+ *   windows  可用时间窗（当天 × 场地 × 时段）
+ *   matches  已排期场次（自带日期/场地/起止时间）
+ * 前端按 (日期, 场地, 时间) 自行分桶渲染，**同一时间窗内可以有多场**。
+ *
+ * 老数据（只有 slot_id、没有 play_date/start_time）会在服务端回填成 match 的时间，
+ * 保证升级后老赛程照样能显示。
+ */
 router.get('/gantt', async (req, res, next) => {
   try {
     const { competition_id } = req.query;
 
-    const dates = await query(
-      'SELECT DISTINCT play_date FROM schedule_slot WHERE competition_id = ? ORDER BY play_date',
-      [competition_id]
-    );
     const venues = await query(
       'SELECT * FROM venue WHERE competition_id = ? ORDER BY venue_no',
       [competition_id]
     );
-    const slots = await query(
+
+    const windows = await query(
       `SELECT ss.*, v.venue_no, v.name AS venue_name FROM schedule_slot ss
        JOIN venue v ON v.id = ss.venue_id
-       WHERE ss.competition_id = ? ORDER BY ss.play_date, ss.start_time, v.venue_no`,
+       WHERE ss.competition_id = ? ORDER BY ss.play_date, v.venue_no, ss.slot_index`,
       [competition_id]
     );
 
@@ -488,42 +638,210 @@ router.get('/gantt', async (req, res, next) => {
       [competition_id]
     );
 
-    const matchMap = new Map(matches.map((m) => [m.slot_id, m]));
-
-    const cells = slots.map((s) => {
-      const m = matchMap.get(s.id);
+    // 老数据回填：只有 slot_id 的，从时间窗借时间与场地
+    const winById = new Map(windows.map((w) => [w.id, w]));
+    const decorate = (m) => {
+      let date = m.play_date;
+      let start = m.start_time;
+      let end = m.end_time;
+      let venueId = m.venue_id;
+      if ((!date || !start) && m.slot_id && winById.has(m.slot_id)) {
+        const w = winById.get(m.slot_id);
+        date = date || w.play_date;
+        start = start || w.start_time;
+        end = end || w.end_time;
+        venueId = venueId || w.venue_id;
+      }
       return {
-        slot_id: s.id,
-        date: s.play_date,
-        venue_no: s.venue_no,
-        venue_name: s.venue_name,
-        slot_index: s.slot_index,
-        start_time: (s.start_time || '').slice(0, 5),
-        end_time: (s.end_time || '').slice(0, 5),
-        slot_type: s.slot_type,
-        occupation: s.occupation,
-        match: m ? {
-          id: m.id,
-          seq_no: m.seq_no,
-          stage: m.stage,
-          stage_label: STAGE_LABEL[m.stage],
-          band_id: m.band_id,
-          event_item_id: m.event_item_id,
-          event_name: m.event_name,
-          band_label: bandLabel({ stage: m.band_stage, gender: m.gender, label: m.band_label }),
-          team_a: m.team_a_name || m.ref_a,
-          team_b: m.team_b_name || m.ref_b,
-          score_a: m.score_a,
-          score_b: m.score_b,
-          status: m.status
-        } : null
+        id: m.id,
+        seq_no: m.seq_no,
+        stage: m.stage,
+        stage_label: STAGE_LABEL[m.stage],
+        band_id: m.band_id,
+        event_item_id: m.event_item_id,
+        event_name: m.event_name,
+        band_label: bandLabel({ stage: m.band_stage, gender: m.gender, label: m.band_label }),
+        team_a: m.team_a_name || m.ref_a,
+        team_b: m.team_b_name || m.ref_b,
+        score_a: m.score_a,
+        score_b: m.score_b,
+        status: m.status,
+        confirmed: Number(m.confirmed) === 1,
+        date,
+        start_time: start ? String(start).slice(0, 5) : null,
+        end_time: end ? String(end).slice(0, 5) : null,
+        venue_id: venueId,
+        slot_id: m.slot_id
       };
-    });
+    };
+
+    const decorated = matches.map(decorate);
+    const scheduled = decorated.filter((m) => m.date && m.start_time);
+    const unscheduled = decorated.filter((m) => !m.date || !m.start_time);
+
+    // 比赛日：优先取已排期场次的日期，其次取时间窗的日期
+    const dateSet = new Set();
+    scheduled.forEach((m) => dateSet.add(m.date));
+    windows.forEach((w) => dateSet.add(w.play_date));
+    const dates = [...dateSet].filter(Boolean).sort();
 
     res.json(ok({
-      dates: dates.map((d) => d.play_date),
+      dates,
       venues: venues.map((v) => ({ id: v.id, venue_no: v.venue_no, name: v.name })),
-      cells
+      // 可用时间窗（前端画"可放置区"的底纹）
+      windows: windows.map((w) => ({
+        id: w.id,
+        date: w.play_date,
+        venue_id: w.venue_id,
+        venue_no: w.venue_no,
+        venue_name: w.venue_name,
+        slot_index: w.slot_index,
+        start_time: String(w.start_time || '').slice(0, 5),
+        end_time: String(w.end_time || '').slice(0, 5),
+        slot_type: w.slot_type,
+        occupation: w.occupation
+      })),
+      // 已排期场次（自带时间地点）
+      matches: scheduled,
+      // 未排期场次
+      unplaced: unscheduled
+    }));
+  } catch (e) { next(e); }
+});
+
+/**
+ * 对阵表（与排期解耦）
+ * GET /api/schedule/lineup?competition_id=1&event_item_id=&band_id=
+ *
+ * ============================================================
+ * 为什么需要这个接口
+ * ============================================================
+ * 原来「谁跟谁比」和「什么时候在哪打」被揉进了同一个"时间槽"概念，
+ * 结果是：
+ *   - 淘汰赛生成后，因为装箱只排 stage=1，在甘特图上根本看不见
+ *   - 管理员无法回答「我的赛程编排到哪一步了」
+ *
+ * 这个接口把**对阵**单独抽出来：
+ *   小组赛 → 轮次矩阵（Berger，每轮几场一目了然）
+ *   淘汰赛 → 对阵树（按轮次）
+ * 完全不涉及时间地点，所以「生成对阵」不再需要先「生成时间槽」。
+ */
+router.get('/lineup', async (req, res, next) => {
+  try {
+    const { competition_id, event_item_id, band_id } = req.query;
+    if (!competition_id) return res.json(fail('缺少赛事参数'));
+
+    const where = ['m.competition_id = ?'];
+    const params = [competition_id];
+    if (event_item_id) { where.push('m.event_item_id = ?'); params.push(event_item_id); }
+    if (band_id) { where.push('m.band_id = ?'); params.push(band_id); }
+
+    const matches = await query(
+      `SELECT m.*, ta.team_name AS team_a_name, tb.team_name AS team_b_name,
+              ei.name AS event_name, ei.category, ei.schedule_mode,
+              gb.label AS band_label, gb.stage AS band_stage, gb.gender
+         FROM match_info m
+         LEFT JOIN team_entry ta ON ta.id = m.team_a_id
+         LEFT JOIN team_entry tb ON tb.id = m.team_b_id
+         JOIN event_item ei ON ei.id = m.event_item_id
+         JOIN group_band gb ON gb.id = m.band_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY m.band_id, m.event_item_id, m.stage, m.round_no, m.seq_no`,
+      params
+    );
+
+    // 按「组别 × 项目」分组
+    const combos = new Map();
+    for (const m of matches) {
+      const k = `${m.band_id}|${m.event_item_id}`;
+      if (!combos.has(k)) {
+        combos.set(k, {
+          band_id: m.band_id,
+          band_label: bandLabel({ stage: m.band_stage, gender: m.gender, label: m.band_label }),
+          event_item_id: m.event_item_id,
+          event_name: m.event_name,
+          schedule_mode: m.schedule_mode || 'GROUP_KO',
+          groups: new Map(),
+          total: 0,
+          done: 0,
+          scheduled: 0
+        });
+      }
+      const c = combos.get(k);
+      c.total++;
+      if (Number(m.status) === 1) c.done++;
+      if (m.play_date) c.scheduled++;
+
+      // 小组赛按小组归拢，淘汰赛按轮次归拢
+      const gk = m.stage === 1
+        ? `g-${m.heat_group_id || 'single'}`
+        : `s-${m.stage}-r${m.round_no || 0}`;
+      if (!c.groups.has(gk)) {
+        c.groups.set(gk, {
+          key: gk,
+          group_id: m.heat_group_id,
+          group_letter: m.stage === 1 ? m.group_letter : null,
+          stage: m.stage,
+          round_no: m.round_no,
+          rounds: new Map()
+        });
+      }
+      const g = c.groups.get(gk);
+      if (!g.rounds.has(m.round_no || 0)) g.rounds.set(m.round_no || 0, []);
+      g.rounds.get(m.round_no || 0).push(m);
+    }
+
+    const out = [];
+    for (const c of combos.values()) {
+      const groups = [];
+      for (const g of c.groups.values()) {
+        const rounds = [...g.rounds.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([rn, list]) => ({
+            round_no: rn,
+            matches: list.map((m) => ({
+              id: m.id,
+              seq_no: m.seq_no,
+              stage: m.stage,
+              stage_label: STAGE_LABEL[m.stage],
+              team_a: m.team_a_name || m.ref_a || '待定',
+              team_b: m.team_b_name || m.ref_b || '待定',
+              team_a_id: m.team_a_id,
+              team_b_id: m.team_b_id,
+              score_a: m.score_a,
+              score_b: m.score_b,
+              status: m.status,
+              scheduled: !!m.play_date,
+              play_date: m.play_date,
+              start_time: m.start_time ? String(m.start_time).slice(0, 5) : null,
+              venue_id: m.venue_id
+            }))
+          }));
+        groups.push({
+          key: g.key,
+          group_id: g.group_id,
+          group_letter: g.group_letter,
+          stage: g.stage,
+          stage_label: STAGE_LABEL[g.stage],
+          rounds
+        });
+      }
+      out.push({
+        band_id: c.band_id,
+        band_label: c.band_label,
+        event_item_id: c.event_item_id,
+        event_name: c.event_name,
+        schedule_mode: c.schedule_mode,
+        total: c.total,
+        done: c.done,
+        scheduled: c.scheduled,
+        groups
+      });
+    }
+
+    res.json(ok({
+      total: out.length,
+      combos: out
     }));
   } catch (e) { next(e); }
 });
@@ -532,94 +850,140 @@ router.get('/gantt', async (req, res, next) => {
  * 拖拽 / 手动调整场次落位
  * PUT /api/schedule/match/:id
  *
- * 两种传参方式：
- *   1) { slot_id }                                —— 直接落到已有时间槽
- *   2) { play_date, start_time, venue_id }        —— 拖到空白格子：
- *      同日期同场地同时间的槽已存在就复用，不存在则按项目时长新建一个
+ * 【模型变更】原来只有两种传参：
+ *   1) { slot_id }                          —— 落到某个固定格子
+ *   2) { play_date, start_time, venue_id }  —— 落到空白处则新建一个格子
+ * 新模型下场次自带时间地点，同一时间窗内允许多场，所以：
+ *   - 直接传 { play_date, start_time, venue_id } 即可，**不需要 slot_id**
+ *   - slot_id 只是额外记录「落在哪个可用时间窗」，不再是一对一的归属
+ *   - 时长按项目的 match_minutes 计算（原来写死 40 分钟）
  */
 router.put('/match/:id', roleRequired(1), async (req, res, next) => {
   try {
-    const { slot_id, play_date, start_time, venue_id } = req.body;
+    const { slot_id, play_date, start_time, venue_id, end_time } = req.body;
     const matchId = req.params.id;
 
     const m = await queryOne('SELECT * FROM match_info WHERE id = ?', [matchId]);
     if (!m) return res.json(fail('场次不存在'));
 
-    let targetSlotId = Number(slot_id) || 0;
-
-    if (!targetSlotId) {
-      if (!play_date || !start_time || !venue_id) {
-        return res.json(fail('请选择目标时间槽'));
-      }
+    // ---- 情况一：给了具体时间地点（新模型的主路径）----
+    if (play_date && start_time && venue_id) {
       const st = String(start_time).slice(0, 5);
+      const minutes = await ballTimeline.matchDuration(m.event_item_id, 40);
+      const et = end_time ? String(end_time).slice(0, 5) : addMinutes(st, minutes);
 
-      // 同日期 + 同场地 + 同开始时间的槽，直接复用
-      const exist = await queryOne(
-        `SELECT id FROM schedule_slot
-         WHERE competition_id = ? AND play_date = ? AND venue_id = ?
-           AND TIME_FORMAT(start_time, '%H:%i') = ?`,
-        [m.competition_id, play_date, venue_id, st]
+      // 场地冲突：同一场地、同一日期、时间区间重叠
+      const venueBusy = await queryOne(
+        `SELECT m.id, m.seq_no,
+                COALESCE(ta.team_name, m.ref_a) AS a,
+                COALESCE(tb.team_name, m.ref_b) AS b
+           FROM match_info m
+           LEFT JOIN team_entry ta ON ta.id = m.team_a_id
+           LEFT JOIN team_entry tb ON tb.id = m.team_b_id
+          WHERE m.competition_id = ? AND m.id != ? AND m.play_date = ? AND m.venue_id = ?
+            AND m.start_time IS NOT NULL
+            AND TIME_TO_SEC(m.start_time) < TIME_TO_SEC(?)
+            AND TIME_TO_SEC(?) < TIME_TO_SEC(m.end_time)`,
+        [m.competition_id, matchId, play_date, venue_id, et, st]
       );
-
-      if (exist) {
-        targetSlotId = exist.id;
-      } else {
-        // 没有就新建一个槽：时长取项目配置，默认 40 分钟
-        const ev = await queryOne('SELECT match_minutes FROM event_item WHERE id = ?', [m.event_item_id]);
-        const minutes = Number(ev && ev.match_minutes) > 0 ? Number(ev.match_minutes) : 40;
-        const endTime = addMinutes(st, minutes);
-
-        const mx = await queryOne(
-          'SELECT MAX(slot_index) AS mx FROM schedule_slot WHERE competition_id = ? AND play_date = ? AND venue_id = ?',
-          [m.competition_id, play_date, venue_id]
-        );
-        const slotIndex = (Number(mx && mx.mx) || 0) + 1;
-
-        const ins = await execute(
-          `INSERT INTO schedule_slot
-             (competition_id, play_date, venue_id, slot_index, start_time, end_time, slot_type)
-           VALUES (?,?,?,?,?,?,1)`,
-          [m.competition_id, play_date, venue_id, slotIndex, `${st}:00`, `${endTime}:00`]
-        );
-        targetSlotId = ins.insertId;
+      if (venueBusy) {
+        return res.json(fail(`该场地此时段已有第 ${venueBusy.seq_no} 场（${venueBusy.a || '待定'} 对 ${venueBusy.b || '待定'}）`));
       }
+
+      // 队伍冲突：同一支队伍同一时段已有另一场
+      const teamBusy = await queryOne(
+        `SELECT m.id, m.seq_no, ta.team_name AS team_a, tb.team_name AS team_b
+           FROM match_info m
+           LEFT JOIN team_entry ta ON ta.id = m.team_a_id
+           LEFT JOIN team_entry tb ON tb.id = m.team_b_id
+          WHERE m.competition_id = ? AND m.id != ? AND m.play_date = ?
+            AND m.start_time IS NOT NULL
+            AND ((m.team_a_id IN (?, ?) AND m.team_a_id IS NOT NULL)
+              OR (m.team_b_id IN (?, ?) AND m.team_b_id IS NOT NULL))
+            AND TIME_TO_SEC(m.start_time) < TIME_TO_SEC(?)
+            AND TIME_TO_SEC(?) < TIME_TO_SEC(m.end_time)`,
+        [m.competition_id, matchId, play_date,
+          m.team_a_id, m.team_b_id, m.team_a_id, m.team_b_id, et, st]
+      );
+      if (teamBusy) {
+        return res.json(fail(`有队伍在这个时段已有第 ${teamBusy.seq_no} 场`));
+      }
+
+      // 关联到覆盖该时刻的可用时间窗（如果有）
+      let winId = Number(slot_id) || 0;
+      if (!winId) {
+        const w = await queryOne(
+          `SELECT id FROM schedule_slot
+            WHERE competition_id = ? AND play_date = ? AND venue_id = ?
+              AND TIME_TO_SEC(start_time) <= TIME_TO_SEC(?)
+              AND TIME_TO_SEC(?) <= TIME_TO_SEC(end_time)
+            ORDER BY slot_index LIMIT 1`,
+          [m.competition_id, play_date, venue_id, st, et]
+        );
+        winId = w?.id || null;
+      }
+
+      await execute(
+        `UPDATE match_info
+            SET play_date = ?, venue_id = ?, start_time = ?, end_time = ?, slot_id = ?
+          WHERE id = ?`,
+        [play_date, venue_id, `${st}:00`, `${et}:00`, winId, matchId]
+      );
+      return res.json(ok({ play_date, venue_id, start_time: st, end_time: et }, '已调整'));
     }
 
-    // 目标槽是"非比赛占位"（开幕式、体测等），不能塞比赛
-    const slot = await queryOne('SELECT slot_type, occupation FROM schedule_slot WHERE id = ?', [targetSlotId]);
-    if (!slot) return res.json(fail('目标时间槽不存在'));
-    if (Number(slot.slot_type) === 2) {
-      return res.json(fail(`该时间槽已被「${slot.occupation || '占位'}」占用，不能放比赛`));
+    // ---- 情况二：只给了 slot_id（老数据兼容）----
+    if (slot_id) {
+      const targetSlotId = Number(slot_id);
+      const slot = await queryOne(
+        'SELECT * FROM schedule_slot WHERE id = ?', [targetSlotId]
+      );
+      if (!slot) return res.json(fail('目标时段不存在'));
+
+      if (Number(slot.slot_type) === 2) {
+        return res.json(fail(`该时段已被「${slot.occupation || '占位'}」占用，不能放比赛`));
+      }
+
+      const minutes = await ballTimeline.matchDuration(m.event_item_id, 40);
+      const st = String(slot.start_time).slice(0, 5);
+      const et = addMinutes(st, minutes);
+
+      await execute(
+        `UPDATE match_info
+            SET play_date = ?, venue_id = ?, start_time = ?, end_time = ?, slot_id = ?
+          WHERE id = ?`,
+        [slot.play_date, slot.venue_id, `${st}:00`, `${et}:00`, targetSlotId, matchId]
+      );
+      return res.json(ok({ slot_id: targetSlotId }, '已调整'));
     }
 
-    // 检查目标槽位是否已被占用（返回占用方信息，前端提示更清楚）
-    const occupied = await queryOne(
-      `SELECT m.id, m.seq_no,
-              COALESCE(ta.team_name, m.ref_a) AS a,
-              COALESCE(tb.team_name, m.ref_b) AS b
-       FROM match_info m
-       LEFT JOIN team_entry ta ON ta.id = m.team_a_id
-       LEFT JOIN team_entry tb ON tb.id = m.team_b_id
-       WHERE m.slot_id = ? AND m.id != ?`,
-      [targetSlotId, matchId]
-    );
-    if (occupied) {
-      return res.json(fail(`该时间槽已有第 ${occupied.seq_no} 场（${occupied.a || '待定'} 对 ${occupied.b || '待定'}）`));
-    }
-
-    await execute('UPDATE match_info SET slot_id = ? WHERE id = ?', [targetSlotId, matchId]);
-    res.json(ok({ slot_id: targetSlotId }, '已调整'));
+    return res.json(fail('请指定比赛日期、时间与场地'));
   } catch (e) { next(e); }
 });
 
 /**
- * 手动设置开赛时间（不改槽位）
+ * 手动设置开赛时间（只改这一场，不动其他场次）
+ * PATCH /api/schedule/match/:id/time
+ *
+ * 原来改的是 schedule_slot.start_time —— 一改就影响了**所有落在那个格子上的比赛**
+ * （虽然当时一格只有一场，但语义是错的）。现在只改这一场自己的时间。
  */
 router.patch('/match/:id/time', roleRequired(1), async (req, res, next) => {
   try {
-    const { start_time } = req.body;
+    const { start_time, end_time } = req.body;
     if (!start_time) return res.json(fail('请填写时间'));
-    await execute('UPDATE schedule_slot SET start_time = ? WHERE id = (SELECT slot_id FROM match_info WHERE id = ?)', [start_time, req.params.id]);
+
+    const m = await queryOne('SELECT * FROM match_info WHERE id = ?', [req.params.id]);
+    if (!m) return res.json(fail('场次不存在'));
+
+    const st = String(start_time).slice(0, 5);
+    const minutes = await ballTimeline.matchDuration(m.event_item_id, 40);
+    const et = end_time ? String(end_time).slice(0, 5) : addMinutes(st, minutes);
+
+    await execute(
+      'UPDATE match_info SET start_time = ?, end_time = ? WHERE id = ?',
+      [`${st}:00`, `${et}:00`, req.params.id]
+    );
     res.json(ok(null, '已调整'));
   } catch (e) { next(e); }
 });
@@ -718,25 +1082,34 @@ router.post('/manual', roleRequired(1), async (req, res, next) => {
     }
 
     // ---------- 先做完全部校验，再落库 ----------
-    // 否则校验失败时已创建的空槽会残留在甘特图上
 
-    // 查已有槽（此时不创建）
-    let slot = await queryOne(
-      `SELECT * FROM schedule_slot
-       WHERE competition_id = ? AND play_date = ? AND venue_id = ? AND start_time = ?
-       LIMIT 1`,
-      [competition_id, play_date, venue_id, timeStr]
+    // 场地时间冲突（同场地、时间重叠）
+    const venueBusy = await queryOne(
+      `SELECT id, seq_no FROM match_info
+        WHERE competition_id = ? AND play_date = ? AND venue_id = ?
+          AND start_time IS NOT NULL
+          AND TIME_TO_SEC(start_time) < TIME_TO_SEC(?)
+          AND TIME_TO_SEC(?) < TIME_TO_SEC(end_time)
+        LIMIT 1`,
+      [competition_id, play_date, venue_id, endStr, timeStr]
     );
+    if (venueBusy) {
+      return res.json(fail(`该场地此时段已有第 ${venueBusy.seq_no} 场，请换时间或场地`));
+    }
 
-    if (slot) {
-      if (slot.slot_type === 2) {
-        return res.json(fail(`该时段已被占用（${slot.occupation || '非比赛'}）`));
-      }
-      // 一个槽一场比赛：同场地同时刻不能重复
-      const occupied = await queryOne('SELECT id, seq_no FROM match_info WHERE slot_id = ? LIMIT 1', [slot.id]);
-      if (occupied) {
-        return res.json(fail(`该时间该场地已有第 ${occupied.seq_no} 场，请换时间或场地`));
-      }
+    // 队伍时间冲突（同一支队伍同一时段不能打两场）
+    const teamBusy = await queryOne(
+      `SELECT id, seq_no FROM match_info
+        WHERE competition_id = ? AND play_date = ?
+          AND start_time IS NOT NULL
+          AND ((team_a_id = ? OR team_b_id = ?) OR (team_a_id = ? OR team_b_id = ?))
+          AND TIME_TO_SEC(start_time) < TIME_TO_SEC(?)
+          AND TIME_TO_SEC(?) < TIME_TO_SEC(end_time)
+        LIMIT 1`,
+      [competition_id, play_date, team_a_id, team_a_id, team_b_id, team_b_id, endStr, timeStr]
+    );
+    if (teamBusy) {
+      return res.json(fail(`有队伍在这个时段已有第 ${teamBusy.seq_no} 场，请换时间`));
     }
 
     // 同一对队伍在同一项目里不能重复对阵
@@ -754,21 +1127,17 @@ router.post('/manual', roleRequired(1), async (req, res, next) => {
       if (dupPair) return res.json(fail('这两支队伍在该项目里已经排过一场了'));
     }
 
-    // 校验全过，开始写库：没有槽就建一个
-    if (!slot) {
-      const maxRow = await queryOne(
-        `SELECT COALESCE(MAX(slot_index), 0) AS mx FROM schedule_slot
-         WHERE competition_id = ? AND play_date = ? AND venue_id = ?`,
-        [competition_id, play_date, venue_id]
-      );
-      const idx = Number(maxRow?.mx || 0) + 1;
-      const r = await execute(
-        `INSERT INTO schedule_slot
-          (competition_id, play_date, venue_id, slot_index, start_time, end_time, slot_type)
-         VALUES (?,?,?,?,?,?,1)`,
-        [competition_id, play_date, venue_id, idx, timeStr, endStr]
-      );
-      slot = { id: r.insertId, slot_type: 1 };
+    // 关联到覆盖该时刻的可用时间窗（如果有），不再强制建槽
+    const win = await queryOne(
+      `SELECT id, slot_type, occupation FROM schedule_slot
+        WHERE competition_id = ? AND play_date = ? AND venue_id = ?
+          AND TIME_TO_SEC(start_time) <= TIME_TO_SEC(?)
+          AND TIME_TO_SEC(?) <= TIME_TO_SEC(end_time)
+        ORDER BY slot_index LIMIT 1`,
+      [competition_id, play_date, venue_id, timeStr, endStr]
+    );
+    if (win && Number(win.slot_type) === 2) {
+      return res.json(fail(`该时段已被占用（${win.occupation || '非比赛'}）`));
     }
 
     // 场序
@@ -780,15 +1149,18 @@ router.post('/manual', roleRequired(1), async (req, res, next) => {
 
     const r = await execute(
       `INSERT INTO match_info
-        (competition_id, band_id, event_item_id, stage, round_no, seq_no, team_a_id, team_b_id, slot_id, status)
-       VALUES (?,?,?,?,0,?,?,?,?,0)`,
-      [competition_id, band_id, event_item_id, Number(stage) || 1, seq, team_a_id, team_b_id, slot.id]
+        (competition_id, band_id, event_item_id, stage, round_no, seq_no,
+         team_a_id, team_b_id, slot_id, play_date, start_time, end_time, venue_id, status)
+       VALUES (?,?,?,?,0,?,?,?,?,?,?,?,?,0)`,
+      [competition_id, band_id, event_item_id, Number(stage) || 1, seq,
+       team_a_id, team_b_id, win?.id || null,
+       play_date, timeStr, endStr, venue_id]
     );
 
     res.json(ok({
       id: r.insertId,
       seq_no: seq,
-      slot_id: slot.id,
+      slot_id: win?.id || null,
       start_time: timeStr.slice(0, 5),
       end_time: endStr.slice(0, 5)
     }, `已排定第 ${seq} 场：${st}`));
@@ -815,12 +1187,17 @@ router.delete('/match/:id', roleRequired(1), async (req, res, next) => {
 });
 
 /**
- * 清除整个时间段（甘特图整行）：删掉该时刻所有场地的槽位及其上的比赛
+ * 清除整个时间段（甘特图整行）
  * POST /api/schedule/clear-time
  * body: { competition_id, start_time, play_date?, force? }
  *   start_time  'HH:mm' 或 'HH:mm:00'
  *   play_date   不传 = 所有日期的同一时刻
  *   force=1     连同已录分的场次一起删（默认拒绝）
+ *
+ * 【模型变更】原来删的是「槽位 + 挂在槽上的比赛」。
+ * 现在比赛自带日期/时间，与时间窗不再是 1:1，所以改成：
+ *   - 把该时刻的**比赛**清空（取消排期，或按 force 删除）
+ *   - 同时把该时刻的**可用时间窗**也清掉（它属于"时间规划"，跟槽位一个性质）
  */
 router.post('/clear-time', roleRequired(1), async (req, res, next) => {
   try {
@@ -831,27 +1208,32 @@ router.post('/clear-time', roleRequired(1), async (req, res, next) => {
     if (!/^\d{1,2}:\d{2}$/.test(st)) return res.json(fail('时间格式应为 HH:mm'));
     const timeStr = `${st.padStart(5, '0')}:00`;
 
-    const where = ['ss.competition_id = ?', 'ss.start_time = ?'];
+    const where = ['competition_id = ?', 'start_time = ?'];
     const params = [competition_id, timeStr];
     if (play_date) {
-      where.push('ss.play_date = ?');
+      where.push('play_date = ?');
       params.push(play_date);
     }
 
-    const rows = await query(
-      `SELECT ss.id AS slot_id, ss.play_date, ss.slot_type,
-              m.id AS match_id, m.seq_no, m.status
-       FROM schedule_slot ss
-       LEFT JOIN match_info m ON m.slot_id = ss.id
-       WHERE ${where.join(' AND ')}
-       ORDER BY ss.play_date, ss.id`,
+    // 该时刻的可用时间窗
+    const wins = await query(
+      `SELECT id, slot_type, occupation FROM schedule_slot
+        WHERE ${where.join(' AND ')} ORDER BY id`,
       params
     );
 
-    if (rows.length === 0) return res.json(fail('该时段没有可清除的槽位'));
+    // 该时刻的比赛（按自带时间字段查）
+    const mw = ['competition_id = ?', 'start_time = ?'];
+    const mp = [competition_id, timeStr];
+    if (play_date) { mw.push('play_date = ?'); mp.push(play_date); }
+    const matches = await query(
+      `SELECT id, seq_no, status FROM match_info WHERE ${mw.join(' AND ')} ORDER BY seq_no`,
+      mp
+    );
 
-    const withMatch = rows.filter((r) => r.match_id);
-    const scored = withMatch.filter((r) => Number(r.status) === 1);
+    if (!wins.length && !matches.length) return res.json(fail('该时段没有可清除的内容'));
+
+    const scored = matches.filter((r) => Number(r.status) === 1);
 
     // 已录分的场次默认拒绝，避免把成绩误删
     if (scored.length && !force) {
@@ -861,31 +1243,47 @@ router.post('/clear-time', roleRequired(1), async (req, res, next) => {
       );
     }
 
-    const slotIds = [...new Set(rows.map((r) => r.slot_id))];
-    const matchIds = [...new Set(withMatch.map((r) => r.match_id))];
+    const matchIds = matches.map((r) => r.id);
+    const winIds = wins.map((r) => r.id);
 
-    // 先清关联数据，再删比赛，最后删槽
     if (matchIds.length) {
       const ph = matchIds.map(() => '?').join(',');
-      await execute(`DELETE FROM match_result WHERE match_id IN (${ph})`, matchIds);
-      await execute(`DELETE FROM match_referee WHERE match_id IN (${ph})`, matchIds);
-      await execute(`DELETE FROM match_info WHERE id IN (${ph})`, matchIds);
+      if (force) {
+        await execute(`DELETE FROM match_result WHERE match_id IN (${ph})`, matchIds);
+        await execute(`DELETE FROM match_referee WHERE match_id IN (${ph})`, matchIds);
+        await execute(`DELETE FROM match_info WHERE id IN (${ph})`, matchIds);
+      } else {
+        // 只取消排期，保留比赛
+        await execute(
+          `UPDATE match_info SET play_date = NULL, start_time = NULL, end_time = NULL,
+                  venue_id = NULL, slot_id = NULL
+            WHERE id IN (${ph})`,
+          matchIds
+        );
+      }
     }
-    const sph = slotIds.map(() => '?').join(',');
-    await execute(`DELETE FROM schedule_slot WHERE id IN (${sph})`, slotIds);
+
+    // 时间窗：占位（slot_type=2）删掉，普通窗口保留（它是排期的骨架）
+    const placeholderIds = wins.filter((w) => Number(w.slot_type) === 2).map((w) => w.id);
+    if (placeholderIds.length) {
+      const ph = placeholderIds.map(() => '?').join(',');
+      await execute(`DELETE FROM schedule_slot WHERE id IN (${ph})`, placeholderIds);
+    }
 
     const scope = play_date ? `${play_date} ` : '';
     res.json(
       ok(
-        { slots: slotIds.length, matches: matchIds.length, scored: scored.length },
-        `已清除 ${scope}${st} 时段：${slotIds.length} 个槽位、${matchIds.length} 场比赛`
+        { slots: winIds.length, matches: matchIds.length, scored: scored.length, forced: !!force },
+        force
+          ? `已清除 ${scope}${st} 时段：${matchIds.length} 场比赛、${placeholderIds.length} 个占位`
+          : `已取消 ${scope}${st} 时段的 ${matchIds.length} 场排期（比赛本身保留）`
       )
     );
   } catch (e) { next(e); }
 });
 
 /**
- * 清理空时间槽（没有比赛、也不是占位的槽）
+ * 清理空时间窗（没有比赛、也不是占位的窗口）
  * POST /api/schedule/clean-empty
  */
 router.post('/clean-empty', roleRequired(1), async (req, res, next) => {
@@ -895,17 +1293,22 @@ router.post('/clean-empty', roleRequired(1), async (req, res, next) => {
 
     const rows = await query(
       `SELECT ss.id FROM schedule_slot ss
-       LEFT JOIN match_info m ON m.slot_id = ss.id
-       WHERE ss.competition_id = ? AND ss.slot_type = 1 AND m.id IS NULL`,
+        WHERE ss.competition_id = ? AND ss.slot_type = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM match_info m
+             WHERE m.slot_id = ss.id
+                OR (m.play_date = ss.play_date AND m.venue_id = ss.venue_id
+                    AND m.start_time >= ss.start_time AND m.start_time < ss.end_time)
+          )`,
       [competition_id]
     );
 
-    if (!rows.length) return res.json(ok({ count: 0 }, '没有需要清理的空槽'));
+    if (!rows.length) return res.json(ok({ count: 0 }, '没有需要清理的空时段'));
 
-    for (const r of rows) {
-      await execute('DELETE FROM schedule_slot WHERE id = ?', [r.id]);
-    }
-    res.json(ok({ count: rows.length }, `已清理 ${rows.length} 个空槽`));
+    const ids = rows.map((r) => r.id);
+    const ph = ids.map(() => '?').join(',');
+    await execute(`DELETE FROM schedule_slot WHERE id IN (${ph})`, ids);
+    res.json(ok({ count: ids.length }, `已清理 ${ids.length} 个空时段`));
   } catch (e) { next(e); }
 });
 
@@ -993,6 +1396,9 @@ function firstWeekday(dateStr, wd) {
  *   - 第 n 轮排在「首个比赛日 + (n-1) 周」
  *   - 每场排到主队（team_a）所属学校的场地；主队没有场地时退回 1 号场地并给出提示
  *   - 同一天同一场地有多场（比如男、女各一场）时，依次占用 16:00、16:45… 等时段
+ *
+ * 【模型变更】原来靠"新建固定格子"来占位（每场一个 slot），
+ * 新模型下每场自带时间地点，不再新建格子；同一场地同一时刻不会撞。
  */
 router.post('/league-auto', roleRequired(1), async (req, res, next) => {
   try {
@@ -1006,7 +1412,7 @@ router.post('/league-auto', roleRequired(1), async (req, res, next) => {
     if (event_item_id) { sql += ' AND event_item_id = ?'; params.push(event_item_id); }
     sql += ' ORDER BY round_no, stage, id';
     const matches = await query(sql, params);
-    if (!matches.length) return res.json(fail('没有可排的比赛，请先在「分组编排」生成小组赛程'));
+    if (!matches.length) return res.json(fail('没有可排的比赛，请先在「分组编排」生成循环赛赛程'));
 
     const evIds = [...new Set(matches.map((m) => m.event_item_id))];
     const events = await query(
@@ -1026,10 +1432,17 @@ router.post('/league-auto', roleRequired(1), async (req, res, next) => {
     const teams = await query('SELECT id, school_id FROM team_entry WHERE competition_id = ?', [competition_id]);
     const teamSchool = new Map(teams.map((t) => [t.id, t.school_id]));
 
+    // 每场时长（按项目配置）
+    const durations = new Map();
+    for (const ev of events) {
+      durations.set(ev.id, Number(ev.match_minutes) > 0 ? Number(ev.match_minutes) : 30);
+    }
+
     const first = firstWeekday(start_date, wd);
-    const slotUsed = new Map();   // `${date}|${venueId}` -> 已占用时段数
+    const slotUsed = new Map();   // `${date}|${venueId}` -> 已占用场次数
     const warnings = [];
-    let placed = 0, newSlots = 0;
+    const updates = [];
+    let placed = 0;
 
     for (const m of matches) {
       const round = Number(m.round_no) || 1;
@@ -1045,35 +1458,49 @@ router.post('/league-auto', roleRequired(1), async (req, res, next) => {
       const key = `${dateStr}|${venue.id}`;
       const idx = slotUsed.get(key) || 0;
       const st = addMinutes(baseTime, idx * interval);
-      const et = addMinutes(st, Math.max(10, interval - 10));
+      const minutes = durations.get(m.event_item_id) || 30;
+      const et = addMinutes(st, minutes);
 
-      let slot = await queryOne(
+      // 关联到覆盖该时刻的可用时间窗（没有也不拦 —— 联赛可以自定义时间）
+      const win = await queryOne(
         `SELECT id FROM schedule_slot
-         WHERE competition_id = ? AND play_date = ? AND venue_id = ? AND start_time = ? LIMIT 1`,
-        [competition_id, dateStr, venue.id, `${st}:00`]);
+          WHERE competition_id = ? AND play_date = ? AND venue_id = ?
+            AND TIME_TO_SEC(start_time) <= TIME_TO_SEC(?)
+            AND TIME_TO_SEC(?) <= TIME_TO_SEC(end_time)
+          ORDER BY slot_index LIMIT 1`,
+        [competition_id, dateStr, venue.id, `${st}:00`, `${et}:00`]
+      );
 
-      if (!slot) {
-        const mx = await queryOne(
-          'SELECT COALESCE(MAX(slot_index),0) AS mx FROM schedule_slot WHERE competition_id=? AND play_date=? AND venue_id=?',
-          [competition_id, dateStr, venue.id]);
-        const ins = await execute(
-          `INSERT INTO schedule_slot (competition_id, play_date, venue_id, slot_index, start_time, end_time, slot_type)
-           VALUES (?,?,?,?,?,?,1)`,
-          [competition_id, dateStr, venue.id, Number(mx?.mx || 0) + 1, `${st}:00`, `${et}:00`]);
-        slot = { id: ins.insertId };
-        newSlots++;
-      }
+      updates.push({
+        id: m.id,
+        play_date: dateStr,
+        venue_id: venue.id,
+        start_time: `${st}:00`,
+        end_time: `${et}:00`,
+        slot_id: win?.id || null
+      });
 
-      await execute('UPDATE match_info SET slot_id = ? WHERE id = ?', [slot.id, m.id]);
       slotUsed.set(key, idx + 1);
       placed++;
     }
+
+    // 事务写库
+    await transaction(async (tx) => {
+      for (const u of updates) {
+        await tx.execute(
+          `UPDATE match_info
+              SET play_date = ?, venue_id = ?, start_time = ?, end_time = ?, slot_id = ?
+            WHERE id = ?`,
+          [u.play_date, u.venue_id, u.start_time, u.end_time, u.slot_id, u.id]
+        );
+      }
+    });
 
     const lastRound = Math.max(...matches.map((m) => Number(m.round_no) || 1));
     res.json(ok({
       placed,
       rounds: lastRound,
-      newSlots,
+      newSlots: 0,
       firstDate: first,
       lastDate: addDays(first, (lastRound - 1) * 7),
       weekday: wd,

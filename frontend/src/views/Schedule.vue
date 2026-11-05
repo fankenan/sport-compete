@@ -19,8 +19,8 @@
 
         <template v-if="arrangeMode === 'auto'">
           <t-button v-if="isKoMode" theme="primary" @click="doGenerateKo">生成对阵</t-button>
-          <t-button theme="primary" variant="outline" @click="openSlots">生成时间槽</t-button>
-          <t-button variant="outline" @click="doPack">自动装箱</t-button>
+          <t-button theme="primary" variant="outline" @click="openSlots">比赛日程</t-button>
+          <t-button variant="outline" @click="doPack">自动排期</t-button>
           <t-button v-if="homeAway" theme="success" variant="outline" @click="openLeague">联赛排期</t-button>
         </template>
         <template v-else>
@@ -44,11 +44,13 @@
         >
           <template #label="slot">{{ homeAway ? '开' : '关' }}</template>
         </t-switch>
+
+        <t-button variant="outline" @click="openPoints">积分规则</t-button>
       </div>
 
       <p class="mode-hint">
         <template v-if="arrangeMode === 'auto'">
-          先「生成时间槽」规划每天有哪些时段可用，再「自动装箱」把比赛按规则铺进去；铺完可以点格子微调。
+          先「比赛日程」定下哪几天、每天哪些时段可打，再「自动排期」把比赛按规则铺进去；铺完可以点格子微调。
         </template>
         <template v-if="isKoMode">
           <span class="ha-on">
@@ -59,7 +61,7 @@
           </span>
         </template>
         <template v-else>
-          「新增场次」逐场指定日期、时间（精确到分钟）、场地和对阵双方；不需要先生成时间槽。
+          「新增场次」逐场指定日期、时间（精确到分钟）、场地和对阵双方；不需要先设置比赛日程。
         </template>
         <template v-if="homeAway">
           <span class="ha-on">已开启主客场制：同一对队伍可安排多场比赛（主、客各一场），主队填在「主队（A）」位。</span>
@@ -92,6 +94,56 @@
         当前只显示所选组别 / 项目的比赛，另有 <b>{{ hiddenCount }}</b> 场被隐藏；把组别和项目清空（选回「全部」）即可看到全部比赛。
       </div>
 
+      <!-- 待排期场次：以前系统里没有任何地方能列出「还有哪些没排」，管理员只能凭记忆找 -->
+      <div v-if="unplaced.total > 0" class="unplaced-panel">
+        <div class="up-head">
+          <div class="up-title">
+            <t-icon name="info-circle" size="16px" />
+            <span>还有 <b>{{ unplaced.total }}</b> 场未排期</span>
+            <span v-if="unplaced.pendingResult > 0" class="up-sub">
+              其中 {{ unplaced.pendingResult }} 场要等上一轮赛果才能确定对手
+            </span>
+            <span v-else class="up-sub">{{ unplaced.ready }} 场可以立即排入时间槽</span>
+          </div>
+          <div class="up-actions">
+            <t-button size="small" theme="primary" variant="outline" :loading="packing" @click="doPack">
+              一键排入时间槽
+            </t-button>
+            <t-button size="small" variant="text" @click="unplacedVisible = !unplacedVisible">
+              {{ unplacedVisible ? '收起' : '查看明细' }}
+            </t-button>
+          </div>
+        </div>
+
+        <div v-if="unplacedVisible" class="up-detail">
+          <div class="up-summary">
+            <span v-for="s in unplaced.summary" :key="`${s.band_id}-${s.event_item_id}-${s.stage}`" class="up-chip">
+              {{ s.band_label }} · {{ s.event_name }} · {{ s.stage_label }}
+              <b>{{ s.count }}</b> 场
+              <em v-if="s.ready < s.count">（{{ s.count - s.ready }} 场待定对手）</em>
+            </span>
+          </div>
+          <table class="up-table">
+            <thead>
+              <tr><th>场次</th><th>组别</th><th>项目</th><th>阶段</th><th>对阵</th><th>状态</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in unplaced.matches" :key="m.id">
+                <td class="num">{{ m.seq_no }}</td>
+                <td>{{ m.band_label }}</td>
+                <td>{{ m.event_name }}</td>
+                <td>{{ m.stage_label }}</td>
+                <td class="up-vs">{{ m.team_a }} <span class="up-sep">vs</span> {{ m.team_b }}</td>
+                <td>
+                  <span v-if="m.ready" class="pill-success">可排期</span>
+                  <span v-else class="pill-warning">待赛果</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div v-if="gantt.dates.length === 0" class="empty">
         尚未生成时间槽。点击「生成时间槽」先规划比赛日期与场地时段。
       </div>
@@ -115,10 +167,15 @@
                   <span class="dr-count">{{ grp.matchCount }} 场</span>
                 </td>
               </tr>
+              <!--
+                【模型变更】原来一行 = 一个固定时间槽，一个槽只能挂一场（slot_id 一对一）。
+                现在一行 = 一个**时间刻度**，同一刻度同一场地可以有多场比赛 ——
+                比赛自带 start_time/end_time，长度按项目的 match_minutes。
+              -->
               <tr v-for="row in grp.rows" :key="grp.date + '_' + row.time">
                 <td
                   class="time-col time-clearable"
-                  title="点击清除该时段的所有比赛与槽位"
+                  title="点击清除该时段的所有比赛"
                   @click="onTimeClick(grp, row)"
                 >
                   <span class="tc-time">{{ row.time }}</span>
@@ -137,43 +194,53 @@
                   @dragleave="onDragLeave($event, grp.date, row.time, v.venue_no)"
                   @drop.prevent="onDrop(grp.date, row.time, v)"
                 >
+                  <!-- 非比赛占位（开幕式/体测）：占住这个刻度，不放比赛 -->
                   <div
-                    v-for="c in cellsAt(grp.date, row.time, v.venue_no)"
-                    :key="c.slot_id"
+                    v-for="c in blocksAt(grp.date, row.time, v.venue_no)"
+                    :key="'blk' + c.id"
+                    class="slot block"
+                  >
+                    <span class="block-label">{{ c.occupation }}</span>
+                  </div>
+
+                  <!-- 该刻度该场地的比赛（可多场） -->
+                  <div
+                    v-for="m in matchesAt(grp.date, row.time, v.venue_no)"
+                    :key="m.id"
                     class="slot"
                     :class="{
-                      block: c.slot_type === 2,
-                      done: c.match && c.match.status === 1,
-                      pending: c.match && c.match.status === 0,
-                      'is-empty': c.slot_type !== 2 && !c.match,
-                      dragging: dragMatch && dragMatch.id === c.match?.id
+                      done: m.status === 1,
+                      pending: m.status === 0,
+                      compact: matchesAt(grp.date, row.time, v.venue_no).length > 1,
+                      dragging: dragMatch && dragMatch.id === m.id
                     }"
-                    :draggable="!!c.match"
-                    @dragstart="onDragStart(c)"
+                    :draggable="true"
+                    @dragstart="onDragStartMatch(m)"
                     @dragend="onDragEnd"
-                    @click="onSlotClick(c)"
+                    @click.stop="onSlotClick({ match: m })"
                   >
-                    <template v-if="c.slot_type === 2">
-                      <span class="block-label">{{ c.occupation }}</span>
-                    </template>
-                    <template v-else-if="c.match">
-                      <div class="m-head">
-                        <span class="m-seq">{{ c.match.seq_no }}</span>
-                        <span class="m-band">{{ c.match.band_label }}</span>
-                        <span class="m-stage">{{ c.match.stage_label }}</span>
-                      </div>
-                      <div class="m-teams">
-                        <span :class="{ win: c.match.score_a > c.match.score_b }">{{ c.match.team_a }}</span>
-                        <span class="m-score">{{ c.match.score_a ?? '-' }} : {{ c.match.score_b ?? '-' }}</span>
-                        <span :class="{ win: c.match.score_b > c.match.score_a }">{{ c.match.team_b }}</span>
-                      </div>
-                    </template>
-                    <template v-else>
-                      <span class="empty-slot">
-                        <span class="es-plus">＋</span>
-                        <span class="es-text">添加比赛</span>
-                      </span>
-                    </template>
+                    <div class="m-head">
+                      <span class="m-seq">{{ m.seq_no }}</span>
+                      <span class="m-band">{{ m.band_label }}</span>
+                      <span class="m-stage">{{ m.stage_label }}</span>
+                    </div>
+                    <div class="m-teams">
+                      <span :class="{ win: m.score_a > m.score_b }">{{ m.team_a }}</span>
+                      <span class="m-score">{{ m.score_a ?? '-' }} : {{ m.score_b ?? '-' }}</span>
+                      <span :class="{ win: m.score_b > m.score_a }">{{ m.team_b }}</span>
+                    </div>
+                  </div>
+
+                  <!-- 空位：点一下加比赛 -->
+                  <div
+                    v-if="!matchesAt(grp.date, row.time, v.venue_no).length && !blocksAt(grp.date, row.time, v.venue_no).length"
+                    class="slot is-empty"
+                    @click.stop="onCellClick(grp.date, row.time, v, $event)"
+                  >
+                    <span class="empty-slot">
+                      <span class="es-plus">＋</span>
+                      <span class="es-text">添加比赛</span>
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -370,9 +437,13 @@
       </template>
     </t-dialog>
 
-    <!-- 生成时间槽对话框 -->
-    <t-dialog v-model:visible="slotsVisible" header="生成时间槽" width="440px" attach="body">
-      <t-form label-width="92px" :data="slotForm">
+    <!-- 比赛日程设置（可用时间窗） -->
+    <t-dialog v-model:visible="slotsVisible" header="比赛日程" width="470px" attach="body">
+      <t-alert theme="info" style="margin-bottom: 14px">
+        设定<strong>哪几天比赛、每天哪些时段可以排比赛</strong>。
+        一场比赛会在这些时段内按各项目的实际时长（如篮球 24 分钟）取一段，不再是一格固定一场。
+      </t-alert>
+      <t-form label-width="100px" :data="slotForm">
         <t-form-item label="比赛日期">
           <t-date-picker
             v-model="slotForm.dates"
@@ -384,7 +455,7 @@
             style="width: 100%"
           />
         </t-form-item>
-        <t-form-item label="槽位间隔">
+        <t-form-item label="时段粒度">
           <t-input-number v-model="slotForm.slotInterval" :min="30" :max="120" :step="5" />
           <span class="unit">分钟</span>
         </t-form-item>
@@ -394,14 +465,14 @@
         <t-form-item label="下午开始">
           <t-time-picker v-model="slotForm.pmStart" format="HH:mm" />
         </t-form-item>
-        <t-form-item label="每天槽位">
+        <t-form-item label="每天时段数">
           <t-input-number v-model="slotForm.slotCount" :min="2" :max="20" />
           <span class="unit">个（上午下午各半）</span>
         </t-form-item>
       </t-form>
       <template #footer>
         <t-button variant="outline" @click="slotsVisible = false">取消</t-button>
-        <t-button theme="primary" @click="doGenerateSlots">生成</t-button>
+        <t-button theme="primary" @click="doGenerateSlots">保存日程</t-button>
       </template>
     </t-dialog>
 
@@ -440,6 +511,40 @@
       </template>
     </t-dialog>
 
+    <!-- 积分规则 -->
+    <t-dialog
+      v-model:visible="pointsVisible"
+      header="积分规则"
+      :width="isMobile ? '92%' : '460px'"
+      attach="body"
+      :confirm-btn="{ content: '保存', loading: savingPoints }"
+      @confirm="savePoints">
+      <div class="pr-form">
+        <div class="pr-row">
+          <span class="pr-name">允许平局</span>
+          <t-switch v-model="pointsForm.allow_draw" :custom-value="[1, 0]" />
+          <span class="pr-desc">篮球、排球等项目请关闭</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-name">胜</span>
+          <t-input-number v-model="pointsForm.win_points" :min="0" :max="9" :step="1" style="width: 96px" />
+          <span class="pr-desc">分</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-name">平</span>
+          <t-input-number v-model="pointsForm.draw_points" :min="0" :max="9" :step="1" style="width: 96px" />
+          <span class="pr-desc">分</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-name">负</span>
+          <span class="pr-fixed">0 分</span>
+        </div>
+      </div>
+      <p class="pr-tip">
+        关闭「允许平局」后，淘汰赛阶段如果录出平局，系统会提示录入无效，避免卡在晋级判定上。
+      </p>
+    </t-dialog>
+
     <!-- 占位对话框 -->
     <t-dialog v-model:visible="blockVisible" header="添加非比赛占位" width="420px" attach="body">
       <t-form label-width="90px" :data="blockForm">
@@ -470,7 +575,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useUserStore } from '../store/user';
 import http from '../api/http';
 import { message, confirm } from '../utils/ui';
@@ -524,7 +629,39 @@ const isKoMode = computed(() => {
   const ev = events.value.find((e) => Number(e.id) === Number(filterEvent.value));
   return ev?.schedule_mode === 'KO';
 });
+/** 当前项目是否为联赛/循环赛赛制（不分组、不淘汰） */
+const isLeagueMode = computed(() => {
+  const ev = events.value.find((e) => Number(e.id) === Number(filterEvent.value));
+  return ev?.schedule_mode === 'LEAGUE' || ev?.schedule_mode === 'ROUND';
+});
 const koInfo = ref(null);   // 纯淘汰预览：几个人、几轮、几场、几个轮空
+
+/* ---------- 待排期场次 ---------- */
+const unplaced = ref({ total: 0, ready: 0, pendingResult: 0, summary: [], matches: [] });
+const unplacedVisible = ref(false);
+const packing = ref(false);
+
+async function loadUnplaced() {
+  if (!store.competitionId) return;
+  try {
+    const r = await http.get('/schedule/unplaced', {
+      params: {
+        competition_id: store.competitionId,
+        band_id: filterBand.value || undefined,
+        event_item_id: filterEvent.value || undefined
+      }
+    });
+    unplaced.value = {
+      total: r?.total || 0,
+      ready: r?.ready || 0,
+      pendingResult: r?.pendingResult || 0,
+      summary: r?.summary || [],
+      matches: r?.matches || []
+    };
+  } catch (e) {
+    unplaced.value = { total: 0, ready: 0, pendingResult: 0, summary: [], matches: [] };
+  }
+}
 
 async function loadKoPreview() {
   koInfo.value = null;
@@ -559,6 +696,47 @@ function onFilterChange() {
   loadGantt();
   loadHomeAway();
   loadKoPreview();
+  loadUnplaced();
+}
+
+/* ---------- 积分规则（允许平局 / 胜分 / 平分） ---------- */
+const pointsVisible = ref(false);
+const savingPoints = ref(false);
+const pointsForm = ref({ allow_draw: 0, win_points: 3, draw_points: 1 });
+
+function openPoints() {
+  if (!filterEvent.value) {
+    message.warning('请先在上方「全部项目」里选定项目，积分规则按项目设置');
+    return;
+  }
+  const ev = events.value.find((e) => Number(e.id) === Number(filterEvent.value));
+  pointsForm.value = {
+    allow_draw: Number(ev?.allow_draw) || 0,
+    win_points: Number(ev?.win_points ?? 3),
+    draw_points: Number(ev?.draw_points ?? 1)
+  };
+  pointsVisible.value = true;
+}
+
+async function savePoints() {
+  savingPoints.value = true;
+  try {
+    await http.post('/schedule/event-config', {
+      event_item_id: filterEvent.value,
+      allow_draw: pointsForm.value.allow_draw,
+      win_points: pointsForm.value.win_points,
+      draw_points: pointsForm.value.draw_points
+    });
+    message.success('积分规则已保存');
+    pointsVisible.value = false;
+    loadHomeAway();
+    // 同步刷新项目列表里的缓存（积分规则会显示在项目行上）
+    loadBase();
+  } catch (e) {
+    message.error(e.message);
+  } finally {
+    savingPoints.value = false;
+  }
 }
 
 async function loadHomeAway() {
@@ -637,40 +815,66 @@ const isMobile = ref(window.innerWidth <= 768);
  * 这样手动编排填的任意时间点（如 10:07）也能正确成行，
  * 同一时刻不同场地会自动对齐到同一行
  */
-/** 叠加顶部筛选后的甘特数据（仅影响显示，不影响拖拽落位判断） */
+/**
+ * 甘特数据（叠加顶部筛选后的显示结果）
+ *
+ * 【模型变更】后端返回结构从「格子数组」改成：
+ *   { dates, venues, windows[], matches[], unplaced[] }
+ *   - windows：可用时间窗（当天 × 场地 × 时段），画底纹用
+ *   - matches：已排期场次，自带 date / start_time / end_time / venue_id
+ *   - unplaced：还没排期的场次
+ * 同一时间窗内可以有多场比赛，渲染时按 (日期, 时间, 场地) 分桶。
+ */
 const gantt = computed(() => {
   const data = ganttRaw.value;
   if (!filterBand.value && !filterEvent.value) return data;
+
+  const hide = (m) =>
+    (filterBand.value && Number(m.band_id) !== Number(filterBand.value)) ||
+    (filterEvent.value && Number(m.event_item_id) !== Number(filterEvent.value));
+
   return {
     ...data,
-    cells: data.cells.map((c) => {
-      if (!c.match) return c;
-      const hide = (filterBand.value && Number(c.match.band_id) !== Number(filterBand.value)) ||
-                   (filterEvent.value && Number(c.match.event_item_id) !== Number(filterEvent.value));
-      return hide ? { ...c, match: null } : c;
-    })
+    matches: (data.matches || []).filter((m) => !hide(m)),
+    unplaced: (data.unplaced || []).filter((m) => !hide(m))
   };
 });
 
 /** 被筛选隐藏的比赛场数（提示条用） */
 const hiddenCount = computed(() => {
   if (!filterBand.value && !filterEvent.value) return 0;
-  const all = ganttRaw.value.cells.filter((c) => c.match).length;
-  const shown = gantt.value.cells.filter((c) => c.match).length;
+  const all = (ganttRaw.value.matches || []).length + (ganttRaw.value.unplaced || []).length;
+  const shown = (gantt.value.matches || []).length + (gantt.value.unplaced || []).length;
   return all - shown;
 });
 
+/** 时间刻度表：某天有哪些时刻（来自可用时间窗 + 已排期场次） */
 const dateGroups = computed(() => {
   const byDate = new Map();
 
-  for (const c of gantt.value.cells) {
-    if (!byDate.has(c.date)) byDate.set(c.date, new Map());
-    const timeMap = byDate.get(c.date);
-    const t = c.start_time || '';
+  const ensure = (date) => {
+    if (!byDate.has(date)) byDate.set(date, new Map());
+    return byDate.get(date);
+  };
+
+  // 1) 可用时间窗提供刻度骨架（即使还没排比赛也显示出来，管理员才知道能往哪排）
+  for (const w of gantt.value.windows || []) {
+    const timeMap = ensure(w.date);
+    const t = w.start_time || '';
     if (!timeMap.has(t)) {
-      timeMap.set(t, { time: t, endTime: c.end_time || '', matchCount: 0 });
+      timeMap.set(t, { time: t, endTime: w.end_time || '', matchCount: 0 });
     }
-    if (c.match) timeMap.get(t).matchCount += 1;
+  }
+
+  // 2) 已排期场次的开始时间也作为刻度（老数据可能没有对应窗口）
+  for (const m of gantt.value.matches || []) {
+    if (!m.date) continue;
+    const timeMap = ensure(m.date);
+    const t = m.start_time || '';
+    if (!timeMap.has(t)) {
+      timeMap.set(t, { time: t, endTime: m.end_time || '', matchCount: 0 });
+    }
+    timeMap.get(t).matchCount += 1;
   }
 
   return [...byDate.entries()]
@@ -682,21 +886,44 @@ const dateGroups = computed(() => {
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 });
 
-/** 取某个日期、某个时间点、某个场地的所有槽（用于显示） */
-/** 渲染用（已按筛选裁剪）的槽位索引，同样避免 O(格子数×槽位数) 的重复 filter */
+/** 渲染用索引：日期|时间|场地号 → 比赛数组（已按筛选裁剪） */
 const ganttIndex = computed(() => {
   const m = new Map();
-  for (const c of gantt.value.cells || []) {
-    const k = `${c.date}|${c.start_time}|${c.venue_no}`;
+  for (const x of gantt.value.matches || []) {
+    if (!x.date || !x.start_time) continue;
+    const k = `${x.date}|${x.start_time}|${venueNoOf(x.venue_id)}`;
     const arr = m.get(k);
-    if (arr) arr.push(c);
-    else m.set(k, [c]);
+    if (arr) arr.push(x);
+    else m.set(k, [x]);
   }
   return m;
 });
 
-function cellsAt(date, time, venueNo) {
+/** 占位索引：日期|时间|场地号 → 占位数组 */
+const blockIndex = computed(() => {
+  const m = new Map();
+  for (const w of gantt.value.windows || []) {
+    if (Number(w.slot_type) !== 2) continue;
+    const k = `${w.date}|${w.start_time}|${w.venue_no}`;
+    const arr = m.get(k);
+    if (arr) arr.push(w);
+    else m.set(k, [w]);
+  }
+  return m;
+});
+
+/** 场地 id → 场地号 */
+function venueNoOf(venueId) {
+  const v = (gantt.value.venues || []).find((x) => Number(x.id) === Number(venueId));
+  return v ? v.venue_no : null;
+}
+
+function matchesAt(date, time, venueNo) {
   return ganttIndex.value.get(`${date}|${time}|${venueNo}`) || [];
+}
+
+function blocksAt(date, time, venueNo) {
+  return blockIndex.value.get(`${date}|${time}|${venueNo}`) || [];
 }
 
 /* ---------- 拖拽改场地 / 时间 ---------- */
@@ -710,32 +937,55 @@ function cellKey(date, time, venueNo) {
 }
 
 /** 用未筛选数据判断目标格能不能放（避免筛选把占用场次藏起来导致误判） */
-/** 槽位按「日期|时间|场地号」建索引，避免每次渲染都对全量 cells 做 filter */
 const slotIndex = computed(() => {
   const m = new Map();
-  for (const c of ganttRaw.value.cells || []) {
-    const k = `${c.date}|${c.start_time}|${c.venue_no}`;
+  for (const x of ganttRaw.value.matches || []) {
+    if (!x.date || !x.start_time) continue;
+    const k = `${x.date}|${x.start_time}|${venueNoOfRaw(x.venue_id)}`;
     const arr = m.get(k);
-    if (arr) arr.push(c);
-    else m.set(k, [c]);
+    if (arr) arr.push(x);
+    else m.set(k, [x]);
   }
   return m;
 });
+
+const blockIndexRaw = computed(() => {
+  const m = new Map();
+  for (const w of ganttRaw.value.windows || []) {
+    if (Number(w.slot_type) !== 2) continue;
+    const k = `${w.date}|${w.start_time}|${w.venue_no}`;
+    const arr = m.get(k);
+    if (arr) arr.push(w);
+    else m.set(k, [w]);
+  }
+  return m;
+});
+
+function venueNoOfRaw(venueId) {
+  const v = (ganttRaw.value.venues || []).find((x) => Number(x.id) === Number(venueId));
+  return v ? v.venue_no : null;
+}
 
 function slotsAt(date, time, venueNo) {
   return slotIndex.value.get(`${date}|${time}|${venueNo}`) || [];
 }
 
+function blocksAtRaw(date, time, venueNo) {
+  return blockIndexRaw.value.get(`${date}|${time}|${venueNo}`) || [];
+}
+
 /** 返回 { ok, reason }：ok=true 可落位 */
 function dropState(date, time, venueNo) {
-  const list = slotsAt(date, time, venueNo);
-  if (list.length === 0) return { ok: true, reason: '' };          // 空格子，会自动建槽
-  const c = list[0];
-  if (Number(c.slot_type) === 2) {
-    return { ok: false, reason: `该槽是「${c.occupation || '占位'}」，不能放比赛` };
+  // 占位时段不能放比赛
+  const blk = blocksAtRaw(date, time, venueNo);
+  if (blk.length) {
+    return { ok: false, reason: `该时段是「${blk[0].occupation || '占位'}」，不能放比赛` };
   }
-  if (c.match) {
-    return { ok: false, reason: `该槽已有第 ${c.match.seq_no} 场（${c.match.team_a || '待定'} 对 ${c.match.team_b || '待定'}）` };
+  // 同一场地同一时刻已有比赛 → 冲突（后端也会再校验一次）
+  const list = slotsAt(date, time, venueNo);
+  if (list.length) {
+    const c = list[0];
+    return { ok: false, reason: `该场地此时段已有第 ${c.seq_no} 场（${c.team_a || '待定'} 对 ${c.team_b || '待定'}）` };
   }
   return { ok: true, reason: '' };
 }
@@ -746,15 +996,15 @@ function cellDropClass(date, time, venueNo) {
   return dropState(date, time, venueNo).ok ? 'drop-ok' : 'drop-bad';
 }
 
-function onDragStart(c) {
-  if (!c.match) return;
+function onDragStartMatch(m) {
   dragMatch.value = {
-    id: c.match.id,
-    seq_no: c.match.seq_no,
-    slot_id: c.slot_id,
-    date: c.date,
-    start_time: c.start_time,
-    venue_no: c.venue_no
+    id: m.id,
+    seq_no: m.seq_no,
+    slot_id: m.slot_id,
+    date: m.date,
+    start_time: m.start_time,
+    venue_id: m.venue_id,
+    venue_no: venueNoOf(m.venue_id)
   };
 }
 
@@ -785,7 +1035,7 @@ async function onDrop(date, time, venue) {
   if (!m) return;
 
   // 原地放下，什么也不做
-  if (m.date === date && m.start_time === time && m.venue_no === venue.venue_no) return;
+  if (m.date === date && m.start_time === time && Number(m.venue_id) === Number(venue.id)) return;
 
   const state = dropState(date, time, venue.venue_no);
   if (!state.ok) {
@@ -793,10 +1043,8 @@ async function onDrop(date, time, venue) {
     return;
   }
 
-  const list = slotsAt(date, time, venue.venue_no);
-  const payload = list.length
-    ? { slot_id: list[0].slot_id }
-    : { play_date: date, start_time: time, venue_id: venue.id };
+  // 新模型：直接给日期/时间/场地，后端算结束时间并做冲突校验
+  const payload = { play_date: date, start_time: time, venue_id: venue.id };
 
   try {
     await http.put(`/schedule/match/${m.id}`, payload);
@@ -886,13 +1134,11 @@ const manualHint = computed(() => {
 
 /** 格子悬浮提示 */
 function cellTitle(date, time, venueNo) {
+  const blk = blocksAtRaw(date, time, venueNo);
+  if (blk.length) return `已被「${blk[0].occupation || '占位'}」占用`;
   const list = slotsAt(date, time, venueNo);
-  if (list.length === 0) return `${time} 暂无时间槽，点击可新增比赛`;
-  const empty = list.find((c) => Number(c.slot_type) !== 2 && !c.match);
-  if (empty) return `${time} 空槽，点击添加比赛`;
-  const c = list[0];
-  if (Number(c.slot_type) === 2) return `已被「${c.occupation || '占位'}」占用`;
-  return `已有第 ${c.match?.seq_no ?? ''} 场`;
+  if (!list.length) return `${time} 空闲，点击可新增比赛`;
+  return `${time} 已有 ${list.length} 场：第 ${list.map((c) => c.seq_no).join('、')} 场`;
 }
 
 
@@ -936,12 +1182,15 @@ async function doGenerateSlots() {
 }
 
 async function doPack() {
+  packing.value = true;
   try {
     const r = await http.post('/schedule/pack', { competition_id: store.competitionId });
-    message.success(`已排入 ${r.placed} 场${r.unplaced ? `，${r.unplaced} 场未排入` : ''}`);
-    loadGantt();
+    message.success(`已排入 ${r.placed} 场${r.unplaced ? `，${r.unplaced} 场未排入（时间槽不够或对手未定）` : ''}`);
+    await Promise.all([loadGantt(), loadUnplaced()]);
   } catch (e) {
     message.error(e.message);
+  } finally {
+    packing.value = false;
   }
 }
 
@@ -1055,28 +1304,28 @@ function openManualAt(cell, venue) {
   });
 }
 
-/** 点击格子的空白处（该时间点该场地还没有任何槽） */
+/** 点击格子的空白处（该时间点该场地还没有比赛） */
 function onCellClick(date, time, venue, e) {
-  // 点到具体槽位时交给槽位自己的 click 处理
+  // 点到具体比赛卡片时交给卡片自己的 click 处理
   if (e?.target?.closest?.('.slot')) return;
+
+  // 占位时段不能放比赛
+  const blk = blocksAtRaw(date, time, venue.venue_no);
+  if (blk.length) {
+    message.warning(`该时段已被「${blk[0].occupation || '占位'}」占用，请先取消占位`);
+    return;
+  }
 
   // 用未筛选数据判断，避免顶部筛选把已有安排藏起来
   const list = slotsAt(date, time, venue.venue_no);
   if (list.length === 0) {
-    openManual({ play_date: date, start_time: time, venue_id: venue.id, createSlot: true });
+    // 新模型：不需要"先建槽"，直接按日期/时间/场地加比赛
+    openManual({ play_date: date, start_time: time, venue_id: venue.id });
     return;
   }
-  const empty = list.find((c) => Number(c.slot_type) !== 2 && !c.match);
-  if (empty) {
-    openManualAt(empty, venue);
-    return;
-  }
-  const c = list[0];
-  if (Number(c.slot_type) === 2) {
-    message.warning(`该时段已被「${c.occupation || '占位'}」占用，请先取消占位`);
-  } else {
-    message.warning(`该时段已有第 ${c.match?.seq_no ?? ''} 场，可拖动它改时间，或先删除`);
-  }
+  message.warning(
+    `该场地此时段已有 ${list.length} 场（第 ${list.map((c) => c.seq_no).join('、')} 场），可拖动它们改时间，或先删除`
+  );
 }
 
 function todayStr() {
@@ -1209,17 +1458,21 @@ const clearStats = computed(() => {
   const { date, time, scope } = clearForm.value;
   if (!time) return { slots: 0, matches: 0, blocks: 0, scored: 0 };
 
-  const list = ganttRaw.value.cells.filter(
-    (c) => c.start_time === time && (scope === 'all' || c.date === date)
+  // 新模型：比赛自带日期/时间，占位来自可用时间窗
+  const inScope = (d) => scope === 'all' || d === date;
+
+  const matches = (ganttRaw.value.matches || []).filter(
+    (m) => m.start_time === time && inScope(m.date)
   );
-  const slotIds = new Set(list.map((c) => c.slot_id));
-  const withMatch = list.filter((c) => c.match);
+  const blocks = (ganttRaw.value.windows || []).filter(
+    (w) => w.start_time === time && inScope(w.date) && Number(w.slot_type) === 2
+  );
 
   return {
-    slots: slotIds.size,
-    matches: withMatch.length,
-    blocks: list.filter((c) => Number(c.slot_type) === 2).length,
-    scored: withMatch.filter((c) => Number(c.match.status) === 1).length
+    slots: matches.length + blocks.length,
+    matches: matches.length,
+    blocks: blocks.length,
+    scored: matches.filter((m) => Number(m.status) === 1).length
   };
 });
 
@@ -1330,30 +1583,23 @@ async function doAddBlock() {
 }
 
 function onSlotClick(cell) {
-  if (cell.slot_type === 2) {
-    confirm(`取消「${cell.occupation}」的占位？`, '提示')
-      .then(async () => {
-        await http.delete(`/schedule/block/${cell.slot_id}`);
-        loadGantt();
-      })
-      .catch(() => {});
-    return;
-  }
-  // 空槽：直接在这个位置新增比赛（日期 / 时间 / 场地已预填）
-  if (!cell.match) {
+  const m = cell.match;
+  if (!m) {
+    // 空位：直接在这个位置新增比赛（日期 / 时间 / 场地已预填）
     const venue = gantt.value.venues.find((v) => v.venue_no === cell.venue_no);
-    openManualAt(cell, venue);
+    openManual({
+      play_date: cell.date,
+      start_time: String(cell.start_time || '').slice(0, 5),
+      venue_id: venue?.id ?? null
+    });
     return;
   }
-  // 把槽位的日期/时间/场地补给比赛对象，抽屉里才显示得出来
+  // 打开场次详情抽屉（比赛自带日期/时间/场地）
   currentMatch.value = {
-    ...cell.match,
-    play_date: cell.date,
-    start_time: cell.start_time,
-    end_time: cell.end_time,
-    venue_name: cell.venue_name || `场地${cell.venue_no}`
+    ...m,
+    venue_name: m.venue_name || `场地${venueNoOf(m.venue_id)}`
   };
-  newSlotId.value = cell.slot_id;
+  newSlotId.value = m.slot_id || null;
   newReferee.value = null;
   drawerVisible.value = true;
 }
@@ -1409,12 +1655,14 @@ onMounted(() => {
   loadGantt();
   loadRefs();
   loadHomeAway();
+  loadUnplaced();
 });
 onUnmounted(() => window.removeEventListener('resize', onResize));
 watch(() => store.competitionId, () => {
   loadBase();
   loadGantt();
   loadHomeAway();
+  loadUnplaced();
 });
 </script>
 
@@ -1423,6 +1671,96 @@ watch(() => store.competitionId, () => {
 .gantt-card {
   border-color: var(--app-border);
   border-radius: 8px;
+}
+
+/* ---------- 待排期场次面板 ---------- */
+.unplaced-panel {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--app-warning);
+  background: var(--app-warning-light);
+}
+@media (prefers-color-scheme: dark) {
+  .unplaced-panel { border-color: rgba(217, 119, 6, .5); }
+}
+
+.up-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.up-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--app-text-1);
+  flex-wrap: wrap;
+}
+.up-title b { color: var(--app-warning); font-variant-numeric: tabular-nums; }
+.up-sub { font-size: 12px; color: var(--app-text-2); }
+
+.up-actions { display: flex; align-items: center; gap: 6px; }
+
+.up-detail { margin-top: 12px; }
+
+.up-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.up-chip {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-xs);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-2);
+}
+.up-chip b { color: var(--app-text-1); font-variant-numeric: tabular-nums; }
+.up-chip em { font-style: normal; color: var(--app-warning); }
+
+.up-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: var(--app-surface);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+.up-table th {
+  text-align: left;
+  padding: 7px 10px;
+  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--app-text-2);
+  background: var(--app-surface-2);
+  border-bottom: 1px solid var(--app-border);
+}
+.up-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--app-border-2);
+  color: var(--app-text-1);
+}
+.up-vs { color: var(--app-text-2); }
+.up-sep { color: var(--app-text-3); margin: 0 4px; font-size: 11px; }
+
+/* ---------- 积分规则弹窗 ---------- */
+.pr-form { display: flex; flex-direction: column; gap: 14px; }
+.pr-row { display: flex; align-items: center; gap: 10px; }
+.pr-name { font-size: 13px; color: var(--app-text-1); min-width: 56px; }
+.pr-desc { font-size: 12px; color: var(--app-text-3); }
+.pr-fixed { font-size: 13px; color: var(--app-text-2); }
+.pr-tip {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--app-text-3);
 }
 
 .toolbar {
@@ -1544,11 +1882,14 @@ watch(() => store.competitionId, () => {
 }
 
 .cell {
-  height: 58px;
+  /* 一格可能有多场比赛（同一时刻同一场地并行不再被禁止），
+     行高按内容自适应，不要写死 58px */
+  height: auto;
+  min-height: 52px;
+  vertical-align: top;
 }
 
 .slot {
-  height: 100%;
   border-radius: 4px;
   padding: 4px 6px;
   cursor: pointer;
@@ -1558,6 +1899,20 @@ watch(() => store.competitionId, () => {
      hover 时 Chrome 会反复重算光标，表现为指针狂闪；只过渡真正会变的两个属性 */
   transition: border-color 0.15s ease, background-color 0.15s ease;
   overflow: hidden;
+}
+
+/* 多场比赛堆叠在同一格时，紧密排列 */
+.cell .slot + .slot {
+  margin-top: 3px;
+}
+
+/* 紧凑态：一格多场时把次要信息藏掉，保证看得清 */
+.cell .slot.compact {
+  padding: 2px 5px;
+}
+.cell .slot.compact .m-band,
+.cell .slot.compact .m-stage {
+  display: none;
 }
 
 .slot:hover {
@@ -1718,6 +2073,8 @@ watch(() => store.competitionId, () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
   font-size: 14px;
   font-weight: 500;
   color: var(--app-text-1);

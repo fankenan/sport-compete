@@ -1,7 +1,7 @@
 <template>
   <div class="dash">
     <!-- 顶部欢迎区 -->
-    <div class="hero rise-in">
+    <div class="hero hero-dark rise-in">
       <div class="hero-left">
         <h2 class="hero-title">{{ greeting }}{{ store.user?.real_name ? '，' + store.user.real_name : '' }}</h2>
         <p class="hero-sub">
@@ -28,8 +28,8 @@
     <div class="stat-grid stagger">
       <div class="stat-card" v-for="card in statCards" :key="card.label">
         <div class="stat-top">
-          <div class="stat-icon" :style="{ background: card.iconBg }">
-            <t-icon :name="card.icon" size="20px" :style="{ color: card.iconColor }" />
+          <div class="stat-icon icon-tone" :class="card.tone">
+            <t-icon :name="card.icon" size="20px" />
           </div>
           <div class="stat-meta">
             <p class="stat-label">{{ card.label }}</p>
@@ -93,8 +93,8 @@
               </div>
               <div class="stage-right">
                 <span class="stage-count num">{{ a.done }}/{{ a.total }}</span>
-                <t-tag v-if="a.complete" theme="success" size="small" variant="light">已完成</t-tag>
-                <t-tag v-else theme="warning" size="small" variant="light">进行中</t-tag>
+                <span v-if="a.complete" class="pill-success">已完成</span>
+                <span v-else class="pill-warning">进行中</span>
               </div>
             </div>
           </div>
@@ -176,9 +176,8 @@ const statCards = computed(() => {
       value: joined,
       unit: `/ ${total}`,
       icon: 'usergroup',
-      iconBg: 'linear-gradient(135deg, #e8f0fe, #f2f6ff)',
-      iconColor: 'var(--td-brand-color)',
-      barColor: 'linear-gradient(90deg, #366ef4, var(--td-brand-color))',
+      tone: 'tone-blue',
+      barColor: 'var(--td-brand-color)',
       pct,
       hint: total ? `参赛率 ${pct}%` : ''
     },
@@ -187,8 +186,8 @@ const statCards = computed(() => {
       value: s.team_count || 0,
       unit: '队',
       icon: 'flag',
-      iconBg: 'linear-gradient(135deg, #e6f7f0, #f0fbf7)',
-      iconColor: 'var(--app-success)',
+      tone: 'tone-green',
+      barColor: 'var(--app-success)',
       pct: null,
       hint: `待审核 ${s.team_pending || 0} 队`
     },
@@ -197,8 +196,8 @@ const statCards = computed(() => {
       value: s.athlete_count || 0,
       unit: '人',
       icon: 'user-circle',
-      iconBg: 'linear-gradient(135deg, #fff4e6, #fff9f2)',
-      iconColor: 'var(--app-warning)',
+      tone: 'tone-orange',
+      barColor: 'var(--app-warning)',
       pct: null,
       hint: `${s.group_count || 0} 个小组`
     },
@@ -207,8 +206,8 @@ const statCards = computed(() => {
       value: s.match_done || 0,
       unit: `/ ${s.match_count || 0}`,
       icon: 'chart-bar',
-      iconBg: 'linear-gradient(135deg, #f0eefe, #f6f3ff)',
-      iconColor: '#7b61ff',
+      tone: 'tone-violet',
+      barColor: 'var(--td-brand-color)',
       pct: s.match_count ? Math.round((s.match_done || 0) / s.match_count * 100) : null,
       hint: s.referee_count ? `${s.referee_count} 名裁判执裁` : ''
     }
@@ -292,28 +291,12 @@ watch(() => store.competitionId, () => { loadStats(); loadAdvance(); loadRecent(
 
 <style scoped>
 /* ---------- 欢迎区 ---------- */
+/* 深墨蓝 + 细网格纹理 + 左侧品牌色强调条（替代原三色渐变 + 装饰圆） */
 .hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
-  padding: 22px 24px;
-  background: linear-gradient(120deg, #0b3ba5 0%, var(--td-brand-color) 50%, #2669e8 100%);
-  border-radius: var(--radius-l);
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero::after {
-  content: '';
-  position: absolute;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  right: -80px;
-  top: -120px;
 }
 
 .hero-left {
@@ -323,15 +306,15 @@ watch(() => store.competitionId, () => { loadStats(); loadAdvance(); loadRecent(
 
 .hero-title {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: var(--fs-22);
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .hero-sub {
   margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--fs-13);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .hero-right {

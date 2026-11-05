@@ -40,12 +40,21 @@ async function execute(sql, params = []) {
 
 /**
  * 事务包装
+ *
+ * 传入的 fn 收到一个 tx 对象，里面是**同一���连接**上的 query/queryOne/execute，
+ * 事务内的读写必须用它，不能用模块级的 query/execute（那走的是连接池里的其它连接，
+ * 不在同一事务里，rollback 不会撤销它们）。
  */
 async function transaction(fn) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const result = await fn(conn);
+    const tx = {
+      query: async (sql, params = []) => (await conn.execute(sql, params))[0],
+      queryOne: async (sql, params = []) => (await conn.execute(sql, params))[0][0] || null,
+      execute: async (sql, params = []) => (await conn.execute(sql, params))[0]
+    };
+    const result = await fn(tx);
     await conn.commit();
     return result;
   } catch (err) {

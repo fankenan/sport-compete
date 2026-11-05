@@ -17,7 +17,7 @@
  *     14 人 → size=16、byes=2  → 首轮 6 场 + 2 人轮空
  *     8  人 → size=8、 byes=0  → 直接八进四
  */
-const { query, queryOne, execute } = require('../db');
+const { query, queryOne, execute, transaction } = require('../db');
 
 /** 标准种子位表：seedSlots(8) = [1,8,4,5,3,6,2,7] */
 function seedSlots(size) {
@@ -120,43 +120,55 @@ async function generateKo(competitionId, eventItemId, opts = {}) {
     let seqNo = await nextSeqNo(competitionId);
     let created = 0;
 
-    // ---------- 第 1 轮 ----------
-    const carry = []; // 长度 size/2：轮空者直接带入下一轮，其余为 null
-    for (let j = 0; j < size / 2; j++) {
-      const a = atPos[2 * j];
-      const b = atPos[2 * j + 1];
-      if (a && b) {
-        await execute(
-          `INSERT INTO match_info
-             (competition_id, band_id, event_item_id, stage, round_no, seq_no, team_a_id, team_b_id)
-           VALUES (?,?,?,2,1,?,?,?)`,
-          [competitionId, bandId, eventItemId, seqNo++, a.id, b.id]
-        );
-        created++;
-        carry.push(null);
-      } else {
-        carry.push(a || b || null);
-      }
-    }
+    // 删旧树 + 建新树必须原子完成（原来分开执行，中途失败会留下半截对阵树）
+    await transaction(async (tx) => {
+      await tx.execute(
+        'DELETE FROM match_info WHERE competition_id=? AND event_item_id=? AND band_id=? AND stage IN (2,6)',
+        [competitionId, eventItemId, bandId]
+      );
+      await tx.execute(
+        'DELETE FROM final_rank WHERE competition_id=? AND event_item_id=? AND band_id=?',
+        [competitionId, eventItemId, bandId]
+      );
 
-    // ---------- 第 2 ~ rounds 轮：全部预生成（空位待晋级填充） ----------
-    let prev = carry;
-    for (let r = 2; r <= rounds; r++) {
-      const count = size / 2 ** r;
-      const cur = new Array(count).fill(null);
-      for (let k = 0; k < count; k++) {
-        const teamA = prev[2 * k] ? prev[2 * k].id : null;
-        const teamB = prev[2 * k + 1] ? prev[2 * k + 1].id : null;
-        await execute(
-          `INSERT INTO match_info
-             (competition_id, band_id, event_item_id, stage, round_no, seq_no, team_a_id, team_b_id)
-           VALUES (?,?,?,2,?,?,?,?)`,
-          [competitionId, bandId, eventItemId, r, seqNo++, teamA, teamB]
-        );
-        created++;
+      // ---------- 第 1 轮 ----------
+      const carry = []; // 长度 size/2：轮空者直接带入下一轮，其余为 null
+      for (let j = 0; j < size / 2; j++) {
+        const a = atPos[2 * j];
+        const b = atPos[2 * j + 1];
+        if (a && b) {
+          await tx.execute(
+            `INSERT INTO match_info
+               (competition_id, band_id, event_item_id, stage, round_no, seq_no, team_a_id, team_b_id)
+             VALUES (?,?,?,2,1,?,?,?)`,
+            [competitionId, bandId, eventItemId, seqNo++, a.id, b.id]
+          );
+          created++;
+          carry.push(null);
+        } else {
+          carry.push(a || b || null);
+        }
       }
-      prev = cur;
-    }
+
+      // ---------- 第 2 ~ rounds 轮：全部预生成（空位待晋级填充） ----------
+      let prev = carry;
+      for (let r = 2; r <= rounds; r++) {
+        const count = size / 2 ** r;
+        const cur = new Array(count).fill(null);
+        for (let k = 0; k < count; k++) {
+          const teamA = prev[2 * k] ? prev[2 * k].id : null;
+          const teamB = prev[2 * k + 1] ? prev[2 * k + 1].id : null;
+          await tx.execute(
+            `INSERT INTO match_info
+               (competition_id, band_id, event_item_id, stage, round_no, seq_no, team_a_id, team_b_id)
+             VALUES (?,?,?,2,?,?,?,?)`,
+            [competitionId, bandId, eventItemId, r, seqNo++, teamA, teamB]
+          );
+          created++;
+        }
+        prev = cur;
+      }
+    });
 
     summary.push({
       band_id: bandId,

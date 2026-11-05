@@ -1,6 +1,6 @@
 -- ============================================================
 -- 迁移：田径专项 · 第一期「数据底座」
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < migrate_track_phase1.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < migrate_track_phase1.sql
 -- 说明：全部用 ADD COLUMN，不改已有列；重复执行会报 duplicate，可用下面的
 --       幂等存储过程思路，或先 SELECT 确认。此处为一次性迁移脚本。
 -- ============================================================

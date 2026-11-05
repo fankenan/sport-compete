@@ -19,7 +19,7 @@
 
     <div v-else-if="list.length === 0" class="empty">
       <p class="empty-title">当日暂无赛程</p>
-      <p class="empty-sub">请选择其他日期，或等待组委会发布赛程</p>
+      <p class="empty-sub">可以左右滑动查看其他日期，或等待组委会发布赛程</p>
     </div>
 
     <div v-else class="match-list">
@@ -51,95 +51,13 @@
         </div>
 
         <div v-if="m.status !== 1" class="mc-actions">
-          <t-button theme="primary" size="small" @click="openScore(m)">录入比分</t-button>
+          <span class="mc-readonly">成绩由管理员统一录入</span>
+        </div>
+        <div v-else class="mc-actions">
+          <span class="mc-readonly ok">已由管理员录入</span>
         </div>
       </div>
     </div>
-
-    <!-- 录比分 -->
-    <t-dialog v-model:visible="scoreVisible" header="录入比分" :width="isMobile ? '94%' : '420px'" attach="body">
-      <template v-if="current">
-        <div class="score-head">
-          <div class="sh-team">
-            <span class="sh-name">{{ current.team_a_name }}</span>
-            <span class="sh-school">{{ current.school_a }}</span>
-          </div>
-          <span class="sh-vs">VS</span>
-          <div class="sh-team right">
-            <span class="sh-school">{{ current.school_b }}</span>
-            <span class="sh-name">{{ current.team_b_name }}</span>
-          </div>
-        </div>
-
-        <!-- 快捷结果：点一下就填好胜负，比分仍可手改 -->
-        <div class="quick-row">
-          <t-button
-            size="small"
-            :theme="quickResult === 'A' ? 'primary' : 'default'"
-            variant="outline"
-            @click="pickQuick('A')"
-          >
-            {{ current.team_a_name || '甲方' }} 胜
-          </t-button>
-          <t-button
-            v-if="allowDraw"
-            size="small"
-            :theme="quickResult === 'D' ? 'primary' : 'default'"
-            variant="outline"
-            @click="pickQuick('D')"
-          >
-            平
-          </t-button>
-          <t-button
-            size="small"
-            :theme="quickResult === 'B' ? 'primary' : 'default'"
-            variant="outline"
-            @click="pickQuick('B')"
-          >
-            {{ current.team_b_name || '乙方' }} 胜
-          </t-button>
-          <span class="quick-tip">点一下快速填结果，再点一次取消</span>
-        </div>
-
-        <div class="score-inputs">
-          <t-input-number
-            v-model="scoreForm.score_a"
-            :min="0"
-            :max="300"
-            theme="normal"
-            align="center"
-            placeholder="0"
-            @change="quickResult = ''"
-          />
-          <span class="si-colon">:</span>
-          <t-input-number
-            v-model="scoreForm.score_b"
-            :min="0"
-            :max="300"
-            theme="normal"
-            align="center"
-            placeholder="0"
-            @change="quickResult = ''"
-          />
-        </div>
-
-        <t-checkbox-group v-model="scoreForm.abandon" class="abandon-group">
-          <t-checkbox :value="1">左侧弃权</t-checkbox>
-          <t-checkbox :value="2">右侧弃权</t-checkbox>
-        </t-checkbox-group>
-
-        <p class="abandon-tip">
-          弃权判 0 分告负；同一队第二次弃权，其全部比赛成绩作废。
-        </p>
-
-        <t-textarea v-model="scoreForm.remark" :autosize="{ minRows: 2 }" placeholder="备注（选填）" />
-      </template>
-
-      <template #footer>
-        <t-button variant="outline" @click="scoreVisible = false">取消</t-button>
-        <t-button theme="primary" @click="submitScore">保存</t-button>
-      </template>
-    </t-dialog>
   </div>
 </template>
 
@@ -157,59 +75,29 @@ const loading = ref(false);
 const activeDate = ref('');
 const dateOptions = ref([]);
 
-const scoreVisible = ref(false);
-const current = ref(null);
-const scoreForm = ref({ score_a: 0, score_b: 0, abandon: [], remark: '' });
-const quickResult = ref('');   // A / D / B，空表示没用快捷按钮
-const allowDraw = ref(true);   // 该项目是否允许平局（篮球为 false）
-
-/**
- * 快捷录结果：只帮着把比分填成能体现胜负的形态，真实比分仍可手改
- * 再点一次当前按钮 = 撤销回 0:0
- */
-function pickQuick(kind) {
-  if (quickResult.value === kind) {
-    quickResult.value = '';
-    scoreForm.value.score_a = 0;
-    scoreForm.value.score_b = 0;
-    return;
-  }
-  const a = Number(scoreForm.value.score_a) || 0;
-  const b = Number(scoreForm.value.score_b) || 0;
-  const base = Math.max(a, b);
-
-  if (kind === 'A') {
-    scoreForm.value.score_a = base < 1 ? 2 : (a > b ? a : b + 1);
-    scoreForm.value.score_b = base < 1 ? 0 : b;
-  } else if (kind === 'B') {
-    scoreForm.value.score_b = base < 1 ? 2 : (b > a ? b : a + 1);
-    scoreForm.value.score_a = base < 1 ? 0 : a;
-  } else {
-    const v = base || 1;
-    scoreForm.value.score_a = v;
-    scoreForm.value.score_b = v;
-  }
-  quickResult.value = kind;
-}
-
 const weekMap = ['日', '一', '二', '三', '四', '五', '六'];
 
-/** 生成最近一周的日期选项 */
+/**
+ * 生成最近一周的日期选项
+ *
+ * 【修复】原来只造「今天 + 未来 6 天」，裁判想回看昨天已录的比分都做不到。
+ * 现在往前也留 3 天，赛程进行中能查到前几天。
+ */
 function buildDateOptions() {
   const opts = [];
   const today = new Date();
-  for (let i = 0; i < 7; i++) {
+  for (let i = -3; i < 7; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() + i);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     opts.push({
       value,
-      week: i === 0 ? '今天' : `周${weekMap[d.getDay()]}`,
+      week: i === 0 ? '今天' : (i === -1 ? '昨天' : (i < 0 ? `${-i} 天前` : `周${weekMap[d.getDay()]}`)),
       day: `${d.getMonth() + 1}/${d.getDate()}`
     });
   }
   dateOptions.value = opts;
-  if (!activeDate.value) activeDate.value = opts[0].value;
+  if (!activeDate.value) activeDate.value = opts.find(o => o.week === '今天').value;
 }
 
 function pickDate(d) {
@@ -228,47 +116,6 @@ async function load() {
     list.value = [];
   } finally {
     loading.value = false;
-  }
-}
-
-async function openScore(m) {
-  current.value = m;
-  scoreForm.value = { score_a: 0, score_b: 0, abandon: [], remark: '' };
-  quickResult.value = '';
-  allowDraw.value = true;
-  scoreVisible.value = true;
-
-  // 读项目赛制：篮球等不允许平局的项目不显示「平」
-  if (m.event_item_id) {
-    try {
-      const cfg = await http.get('/schedule/event-config', {
-        params: { event_item_id: m.event_item_id }
-      });
-      allowDraw.value = Number(cfg?.allow_draw) !== 0;
-    } catch (e) { /* 读不到就按允许平局处理 */ }
-  }
-}
-
-async function submitScore() {
-  try {
-    const r = await http.post('/result/score', {
-      match_id: current.value.id,
-      score_a: scoreForm.value.score_a,
-      score_b: scoreForm.value.score_b,
-      abandon_a: scoreForm.value.abandon.includes(1) ? 1 : 0,
-      abandon_b: scoreForm.value.abandon.includes(2) ? 1 : 0,
-      remark: scoreForm.value.remark
-    });
-
-    let msg = '比分已录入';
-    if (r.voided) msg = '比分已录入（该队 2 次弃权，成绩作废）';
-    else if (r.advanced) msg = '比分已录入，已自动生成下一阶段赛程';
-    message.success(msg);
-
-    scoreVisible.value = false;
-    load();
-  } catch (e) {
-    message.error(e.message);
   }
 }
 
@@ -502,6 +349,19 @@ watch(() => store.competitionId, load);
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+}
+
+/* 只读提示：成绩由管理员统一录入 */
+.mc-readonly {
+  font-size: 12px;
+  color: var(--app-text-3);
+  padding: 3px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--app-bg-2);
+}
+.mc-readonly.ok {
+  color: var(--app-success);
+  background: var(--app-success-light);
 }
 
 /* 录比分弹窗 */

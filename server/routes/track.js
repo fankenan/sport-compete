@@ -6,6 +6,100 @@ const scoreEngine = require('../services/scoreEngine');
 const router = express.Router();
 router.use(authRequired);
 
+/**
+ * GET /api/track/overview?competition_id=
+ * 田径编排总览（给「编排中心」用）
+ *
+ * 一次性给出田径赛事的编排进度，让管理员在一个页面看清：
+ *   报名 → 分组编排（赛次） → 日程编排（排进日期/场地/时刻） → 录分 → 统计
+ *
+ * 【为什么需要】原来编排中心只统计球类（filter category === 3），
+ * 田径完全不在编排流程里 —— 管理员要自己判断"田径编排到哪一步了"。
+ */
+router.get('/overview', async (req, res, next) => {
+  try {
+    const { competition_id } = req.query;
+    if (!competition_id) return res.json(fail('缺少赛事参数'));
+
+    // 田径项目（径赛 + 田赛）
+    const events = await query(
+      `SELECT id, name, category, event_type FROM event_item
+        WHERE competition_id = ? AND category IN (1, 2)
+        ORDER BY sort_no, id`,
+      [competition_id]
+    );
+
+    const items = [];
+    for (const ev of events) {
+      // 已通过报名人数
+      const enr = await queryOne(
+        `SELECT COUNT(*) AS c FROM athlete_entry
+          WHERE competition_id = ? AND event_item_id = ? AND status = 2`,
+        [competition_id, ev.id]
+      );
+
+      // 赛次分组数 / 已录分赛次数 / 已确认赛次数
+      const heats = await queryOne(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN h.status >= 3 THEN 1 ELSE 0 END) AS scoring,
+                SUM(CASE WHEN h.confirm_flag = 1 THEN 1 ELSE 0 END) AS confirmed
+           FROM track_heat h
+          WHERE h.competition_id = ? AND h.event_item_id = ?`,
+        [competition_id, ev.id]
+      );
+
+      // 已排进日程的赛次数
+      const planned = await queryOne(
+        `SELECT COUNT(DISTINCT ti.heat_id) AS c
+           FROM timetable_item ti
+           JOIN track_heat h ON h.id = ti.heat_id
+          WHERE ti.competition_id = ? AND h.event_item_id = ?`,
+        [competition_id, ev.id]
+      );
+
+      const total = Number(heats?.total || 0);
+      const scheduled = Number(planned?.c || 0);
+
+      let state = 'todo';
+      let stateLabel = '未开始';
+      if (!Number(enr?.c || 0)) { state = 'todo'; stateLabel = '待报名'; }
+      else if (!total) { state = 'doing'; stateLabel = '待分组编排'; }
+      else if (scheduled < total) { state = 'doing'; stateLabel = '待排期'; }
+      else { state = 'done'; stateLabel = '已排期'; }
+
+      items.push({
+        event_item_id: ev.id,
+        event_name: ev.name,
+        category: ev.category,
+        event_type: ev.event_type,
+        athletes: Number(enr?.c || 0),
+        heats: total,
+        scoring: Number(heats?.scoring || 0),
+        confirmed: Number(heats?.confirmed || 0),
+        scheduled,
+        unplaced: Math.max(0, total - scheduled),
+        state,
+        state_label: stateLabel
+      });
+    }
+
+    // 日程单元（比赛日）概况
+    const units = await queryOne(
+      'SELECT COUNT(*) AS c FROM schedule_unit WHERE competition_id = ?',
+      [competition_id]
+    );
+
+    res.json(ok({
+      total: items.length,
+      items,
+      units: Number(units?.c || 0),
+      heats: items.reduce((s, x) => s + x.heats, 0),
+      scheduled: items.reduce((s, x) => s + x.scheduled, 0),
+      athletes: items.reduce((s, x) => s + x.athletes, 0)
+    }));
+  } catch (e) { next(e); }
+});
+
 // ============================================================
 // 一、项目模板库
 // ============================================================

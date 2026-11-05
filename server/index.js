@@ -50,7 +50,7 @@ console.log('  路由挂载 /api/public（公开）');
 const routes = [
   'auth', 'school', 'competition', 'event', 'band', 'venue',
   'entry', 'group', 'schedule', 'referee', 'result', 'rank', 'stats', 'track',
-  'upload'
+  'martial', 'upload'
 ];
 routes.forEach((r) => {
   const p = path.join(__dirname, 'routes', `${r}.js`);

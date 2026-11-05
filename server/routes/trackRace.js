@@ -2,12 +2,22 @@ const express = require('express');
 const crypto = require('crypto');
 const { query, queryOne, execute, ok, fail } = require('../db');
 const { authRequired, roleRequired } = require('../middleware/auth');
+const { hashPassword } = require('../utils/helpers');
+const announcement = require('../services/announcement');
 
 const router = express.Router();
 router.use(authRequired);
 
+/**
+ * referee_account 表的密码哈希
+ *
+ * 原来这里自己写了一套 sha256(plain + '::sport')，和主体系（现在是 bcrypt）不一致。
+ * 现在统一走 helpers：
+ *   - 新建/重置 → bcrypt
+ *   - 校验 → 兼容旧 sha256，验证通过后自动升级为 bcrypt
+ */
 function hashPwd(plain) {
-  return crypto.createHash('sha256').update(String(plain) + '::sport').digest('hex');
+  return hashPassword(plain);
 }
 
 // ============================================================
@@ -204,7 +214,7 @@ router.get('/changes', async (req, res, next) => {
  *  EVENT_CHANGE : { event_item_id(原), band_id, old_athlete_id, to_event_item_id }
  *  NAME_CHANGE  : { old_athlete_id, after_name }
  */
-router.post('/changes', roleRequired(1, 3), async (req, res, next) => {
+router.post('/changes', roleRequired(1), async (req, res, next) => {
   try {
     const b = req.body;
     const cid = b.competition_id;
@@ -468,7 +478,7 @@ async function doNameChange(cid, b, who) {
 }
 
 /** POST /api/track-race/changes/:id/revoke 撤销变更 */
-router.post('/changes/:id/revoke', roleRequired(1, 3), async (req, res, next) => {
+router.post('/changes/:id/revoke', roleRequired(1), async (req, res, next) => {
   try {
     const c = await queryOne('SELECT * FROM participant_change WHERE id = ?', [req.params.id]);
     if (!c) return res.json(fail('记录不存在'));
@@ -691,71 +701,26 @@ router.put('/announcement/config', roleRequired(1), async (req, res, next) => {
 });
 
 /** POST /api/track-race/announcement/publish 公布一组成绩 */
-router.post('/announcement/publish', roleRequired(1, 3), async (req, res, next) => {
+router.post('/announcement/publish', roleRequired(1), async (req, res, next) => {
   try {
     // 支持单个 heat_id 或批量 heat_ids / heats
-    const ids = normalizeHeatIds(req.body);
+    const ids = announcement.normalizeHeatIds(req.body);
     if (!ids.length) return res.json(fail('请选择要公布的赛次'));
     const who = req.user.real_name || req.user.username;
-    let done = 0;
-    for (const heatId of ids) {
-      const heat = await queryOne(
-        `SELECT h.*, e.name AS event_name FROM track_heat h JOIN event_item e ON e.id = h.event_item_id WHERE h.id = ?`,
-        [heatId]
-      );
-      if (!heat) continue;
-      const entries = await query(
-        'SELECT * FROM heat_entry WHERE heat_id = ? ORDER BY COALESCE(rank_no, 999), id', [heatId]
-      );
-      const exist = await queryOne('SELECT * FROM score_announcement WHERE heat_id = ?', [heatId]);
-      const content = {
-        event_name: heat.event_name,
-        heat_name: heat.heat_name,
-        round_code: heat.round_code,
-        published_by: who,
-        entries: entries.map((e) => ({
-          rank: e.rank_no, lane: e.lane_no ?? e.sort_no, bib: e.bib_no,
-          name: e.athlete_name, school: e.school_name,
-          result: e.result_text, status: e.status_code, score: e.score
-        }))
-      };
-      if (exist) {
-        await execute(
-          'UPDATE score_announcement SET content_json=?, publish_flag=1, published_at=NOW(), published_by=? WHERE id=?',
-          [JSON.stringify(content), who, exist.id]
-        );
-      } else {
-        await execute(
-          `INSERT INTO score_announcement
-            (competition_id, band_id, event_item_id, round_code, heat_id, title, content_json,
-             publish_flag, published_at, published_by)
-           VALUES (?,?,?,?,?,?,?,1,NOW(),?)`,
-          [heat.competition_id, heat.band_id, heat.event_item_id, heat.round_code, heatId,
-           `${heat.event_name} ${heat.heat_name}`, JSON.stringify(content), who]
-        );
-      }
-      done++;
-    }
-    res.json(ok({ count: done }, `已公布 ${done} 个赛次`));
+
+    // 公布逻辑已抽到 services/announcement.js（确认成绩后自动公布也复用它）
+    const r = await announcement.publishHeats(ids, who, req.body.competition_id || null);
+    res.json(ok({ count: r.count }, `已公布 ${r.count} 个赛次`));
   } catch (e) { next(e); }
 });
 
-function normalizeHeatIds(body) {
-  const raw = body.heat_ids ?? body.heats ?? body.heat_id;
-  const arr = Array.isArray(raw) ? raw : (raw === undefined || raw === null || raw === '' ? [] : [raw]);
-  return [...new Set(arr.map((x) => Number(x)).filter((x) => Number.isInteger(x) && x > 0))];
-}
-
 /** POST /api/track-race/announcement/withdraw */
-router.post('/announcement/withdraw', roleRequired(1, 3), async (req, res, next) => {
+router.post('/announcement/withdraw', roleRequired(1), async (req, res, next) => {
   try {
-    const ids = normalizeHeatIds(req.body);
+    const ids = announcement.normalizeHeatIds(req.body);
     if (!ids.length) return res.json(fail('请选择要撤回的赛次'));
-    const ph = ids.map(() => '?').join(',');
-    await execute(
-      `UPDATE score_announcement SET publish_flag = 0 WHERE heat_id IN (${ph})`, ids
-    );
-    res.json(ok({ count: ids.length }, `已撤回 ${ids.length} 个赛次`));
+    const r = await announcement.withdrawHeats(ids);
+    res.json(ok({ count: r.count }, `已撤回 ${r.count} 个赛次`));
   } catch (e) { next(e); }
 });
 

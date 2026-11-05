@@ -1,8 +1,21 @@
 const jwt = require('jsonwebtoken');
 const { queryOne, fail } = require('../db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sport-compete-dev-secret';
-const TOKEN_TTL = '12h';
+/**
+ * JWT 密钥：**必须由环境变量提供**
+ *
+ * 之前这里有个硬编码兜底 'sport-compete-<已废弃的旧口令>' —— 只要有人知道这串字符串，
+ * 就能自己签一个 role=1（管理员）的 token 调用所有管理接口。
+ * 现在缺失即启动失败，宁可起不来也不能带着假密钥上线。
+ */
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error(
+    '[安全] JWT_SECRET 未设置或长度不足 32 位，服务拒绝启动。\n' +
+    '  在 server/.env 里配置：JWT_SECRET=<openssl rand -hex 32 的结果>'
+  );
+}
+const TOKEN_TTL = process.env.JWT_TTL || '2h';
 
 /**
  * 生成 token

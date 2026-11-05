@@ -1,6 +1,6 @@
 -- ============================================================
 -- 迁移：田径专项 · 第二期「分组编排 + 成绩录入」
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < migrate_track_phase2.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < migrate_track_phase2.sql
 -- 说明：现有 heat_group / heat_member 是「队」维度的球类分组，
 --       田径需要「个人 + 赛次 + 道次 + 成绩」维度，故另建一套表。
 -- ============================================================

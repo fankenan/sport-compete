@@ -22,23 +22,19 @@
                 <t-radio value="GREEN">运动绿</t-radio>
               </t-radio-group>
             </t-form-item>
-            <t-form-item label="主要版式">
-              <t-radio-group v-model="cfg.layout">
-                <t-radio value="MIXED">综合</t-radio>
-                <t-radio value="TEAM_SCORE">团体总分</t-radio>
-                <t-radio value="LATEST">最新成绩</t-radio>
-                <t-radio value="RECORD">破纪录</t-radio>
-              </t-radio-group>
-            </t-form-item>
+            <!--
+              【清理假开关】原来这里有 4 个在大屏端从未被消费的设置：
+                主要版式(layout) —— Screen.vue 里零引用
+                待赛(show_upcoming) —— uuid 模式没有对应版块，接口也不返回
+                每屏停留(dwell_seconds) / 循环播放(loop_flag) —— 只驱动 scIndex，
+                  而 scIndex 从未出现在模板里，队列轮播是死功能
+              给管理员留假开关比不给更糟：他会以为大屏已经配好了。
+              现在只保留真正生效的项；版式轮播留待后续实现。
+            -->
             <t-form-item label="显示板块">
               <t-checkbox v-model="cfg.show_team_score" :true-value="1" :false-value="0">团体总分</t-checkbox>
               <t-checkbox v-model="cfg.show_latest" :true-value="1" :false-value="0" style="margin-left:12px">最新成绩</t-checkbox>
-              <t-checkbox v-model="cfg.show_upcoming" :true-value="1" :false-value="0" style="margin-left:12px">待赛</t-checkbox>
               <t-checkbox v-model="cfg.show_record" :true-value="1" :false-value="0" style="margin-left:12px">破纪录滚动</t-checkbox>
-            </t-form-item>
-            <t-form-item label="每屏停留">
-              <t-input-number v-model="cfg.dwell_seconds" :min="3" :max="120" style="width:120px" />
-              <span class="hint" style="margin-left:8px">秒</span>
             </t-form-item>
             <t-form-item label="刷新间隔">
               <t-input-number v-model="cfg.refresh_seconds" :min="5" :max="300" style="width:120px" />
@@ -46,9 +42,6 @@
             </t-form-item>
             <t-form-item label="最新成绩条数">
               <t-input-number v-model="cfg.latest_count" :min="3" :max="50" style="width:120px" />
-            </t-form-item>
-            <t-form-item label="循环播放">
-              <t-switch v-model="cfg.loop_flag" :custom-value="[1, 0]" />
             </t-form-item>
             <t-form-item>
               <t-button theme="primary" :loading="saving" @click="saveConfig">保存设置</t-button>
@@ -73,40 +66,40 @@
         </t-card>
 
         <t-card title="分享链接" size="small" style="margin-top:12px">
-          <t-input :value="screenUrl" readonly>
-            <template #suffix>
-              <t-link theme="primary" @click="copyLink">复制</t-link>
-            </template>
-          </t-input>
-          <div class="hint" style="margin-top:8px">任何人拿到链接都能查看，无需登录</div>
+          <div class="share-row">
+            <span class="share-label">赛事大屏</span>
+            <t-input :value="screenUrl" readonly style="flex:1">
+              <template #suffix>
+                <t-link theme="primary" @click="copyText(screenUrl, '大屏链接')">复制</t-link>
+              </template>
+            </t-input>
+            <t-button size="small" variant="outline" @click="openScreen">打开</t-button>
+          </div>
+
+          <!-- 原来只有大屏链接，观众拿到链接后看不到成绩页 -->
+          <div class="share-row" style="margin-top:8px">
+            <span class="share-label">成绩查询</span>
+            <t-input :value="publicUrl" readonly style="flex:1">
+              <template #suffix>
+                <t-link theme="primary" @click="copyText(publicUrl, '成绩查询链接')">复制</t-link>
+              </template>
+            </t-input>
+            <t-button size="small" variant="outline" @click="openPublic">打开</t-button>
+          </div>
+
+          <div class="hint" style="margin-top:8px">
+            任何人拿到链接都能查看，无需登录。成绩查询页包含赛程总表、成绩、小组积分与淘汰赛对阵。
+          </div>
         </t-card>
       </t-col>
     </t-row>
 
-    <t-card title="播放队列" size="small" style="margin-top:16px">
-      <template #subtitle>
-        <span class="hint">留空 = 自动播放全部已确认项目；勾选后按勾选顺序播放</span>
-      </template>
-      <template #actions>
-        <t-button size="small" variant="outline" @click="selectAllConfirmed">自动填入已确认项目</t-button>
-        <t-button size="small" variant="outline" @click="queue = []" style="margin-left:8px">清空</t-button>
-      </template>
-
-      <div v-if="!queue.length" class="center muted">队列为空，大屏将自动播放全部项目</div>
-      <div v-for="(q, i) in queue" :key="i" class="q-row">
-        <span class="q-i">{{ i + 1 }}</span>
-        <t-select v-model="q.event_item_id" :options="eventOptions" placeholder="项目" style="width:180px" />
-        <t-select v-model="q.band_id" :options="bandOptions" placeholder="组别（可空）" clearable style="width:160px" />
-        <t-input-number v-model="q.seconds" :min="3" :max="120" style="width:100px" />
-        <span class="hint">秒</span>
-        <t-button theme="danger" variant="outline" size="small" @click="queue.splice(i, 1)">删除</t-button>
-      </div>
-      <t-button variant="dashed" block style="margin-top:10px"
-                @click="queue.push({ event_item_id: null, band_id: null, seconds: 12 })">+ 添加一项</t-button>
-      <div style="margin-top:12px">
-        <t-button theme="primary" :loading="saving" @click="saveConfig">保存队列</t-button>
-      </div>
-    </t-card>
+    <!--
+      【清理】原「播放队列」卡片也已移除：
+      队列数据存在 screen_config.queue 里，但大屏端 Screen.vue 的 scIndex
+      从未出现在模板中 —— 队列轮播是死功能，管理员改了没有任何效果。
+      版式/队列轮播计划后续单独实现（需要大屏端按队列取不同板块的数据）。
+    -->
   </div>
 </template>
 
@@ -140,6 +133,35 @@ const screenUrl = computed(() => {
   if (!uuid.value) return '（保存后生成）';
   return `${location.origin}${location.pathname}#/screen/${uuid.value}`;
 });
+/** 公开成绩查询页链接 —— 原来只有大屏链接，观众找不到成绩页 */
+const publicUrl = computed(() => {
+  if (!uuid.value) return '（保存后生成）';
+  return `${location.origin}${location.pathname}#/public/${uuid.value}`;
+});
+
+function copyText(text, label) {
+  if (!text || text.startsWith('（')) {
+    message.warning('请先保存设置生成分享码');
+    return;
+  }
+  const done = () => message.success(`${label}已复制`);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { message.error('复制失败，请手动复制'); }
+  document.body.removeChild(ta);
+}
 
 onMounted(async () => {
   const list = await http.get('/competition/list') || [];
@@ -162,8 +184,12 @@ async function loadUuid() {
   const c = await http.get('/track-stats/public-config', { params: { competition_id: compId.value } });
   uuid.value = c?.uuid || '';
   if (!uuid.value) {
-    const r = await http.put('/track-stats/public-config', { competition_id: compId.value, public_flag: 0 });
-    uuid.value = r?.data?.uuid || '';
+    // 【副作用修复】原来这里顺手写 public_flag: 0 ——
+    // 「打开大屏控制端」变成一个会偷偷把公开成绩查询关掉的操作，
+    // 管理员之后想开公开页会被这个隐藏写入卡住。
+    // 现在只生成 uuid，不动 public_flag。
+    const r = await http.put('/track-stats/public-config', { competition_id: compId.value, generate_uuid: 1 });
+    uuid.value = r?.data?.uuid || r?.uuid || '';
   }
 }
 
@@ -234,6 +260,11 @@ function openScreen() {
   window.open(screenUrl.value, '_blank');
 }
 
+function openPublic() {
+  if (!uuid.value) { MessagePlugin.warning('分享码未生成'); return; }
+  window.open(publicUrl.value, '_blank');
+}
+
 async function copyLink() {
   try { await navigator.clipboard.writeText(screenUrl.value); MessagePlugin.success('链接已复制'); }
   catch { MessagePlugin.info(screenUrl.value); }
@@ -246,6 +277,19 @@ async function copyLink() {
 .page-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
 .head-right { display: flex; gap: 8px; align-items: center; }
 .hint { font-size: 12px; color: var(--app-text-3); }
+
+/* 分享链接行 */
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.share-label {
+  font-size: 13px;
+  color: var(--app-text-2);
+  min-width: 62px;
+  flex-shrink: 0;
+}
 .insert-bar { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .q-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .q-i { width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 4px;

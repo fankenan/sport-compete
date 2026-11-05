@@ -5,13 +5,32 @@
    3) 赛程编排：拖到已被占用的槽 → 返回明确提示
 """
 import json
+import os
 import paramiko
 
-HOST, USER, PWD = '10.128.1.45', 'single', 'jyj2026'
+HOST = _ENV['SPORT_SSH_HOST']
+USER = _ENV['SPORT_SSH_USER']
+PWD  = _ENV['SPORT_SSH_PASSWORD']
 cli = paramiko.SSHClient()
 cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 cli.connect(HOST, 22, USER, PWD, timeout=15)
 
+
+
+def _env(name, fallback=None):
+    """读环境变量；未设置时返回 fallback（可为 None 表示必须显式配置）"""
+    return os.environ.get(name, fallback)
+
+
+def _require_env(name):
+    v = os.environ.get(name)
+    if not v:
+        raise SystemExit(
+            '[安全] 缺少环境变量 %s。\n'
+            '  本脚本会连接真实服务器/数据库，凭据不再写在代码里。\n'
+            '  请先设置环境变量后重试。' % name
+        )
+    return v
 
 def run(cmd, t=240):
     _, o, e = cli.exec_command(cmd, timeout=t)
@@ -19,7 +38,7 @@ def run(cmd, t=240):
 
 
 def mq(sql):
-    o, e = run(f"""mysql -ucompete -p'Compete@2026' sport_compete -N -e "{sql}" 2>&1 | grep -v Warning""")
+    o, e = run(f"""mysql -ucompete -pprocess.env.SPORT_DB_PASSWORD sport_compete -N -e "{sql}" 2>&1 | grep -v Warning""")
     # mysql -N 用制表符分隔列，统一换成 |
     return (o or e).strip().replace('\t', '|')
 

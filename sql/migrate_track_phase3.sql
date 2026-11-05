@@ -1,6 +1,6 @@
 -- ============================================================
 -- 迁移：田径专项 · 第三期「赛中变更 + 号码簿 + 表单打印 + 成绩公布」
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < migrate_track_phase3.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < migrate_track_phase3.sql
 -- ============================================================
 
 SET NAMES utf8mb4;

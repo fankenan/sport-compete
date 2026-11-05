@@ -155,6 +155,18 @@ router.post('/generate-matches', roleRequired(1), async (req, res, next) => {
 });
 
 /**
+ * 生成联赛/循环赛赛程（不分组，全部大循环）
+ * POST /api/group/generate-league
+ */
+router.post('/generate-league', roleRequired(1), async (req, res, next) => {
+  try {
+    const { competition_id, event_item_id } = req.body;
+    const result = await scheduler.generateLeagueMatches(competition_id, event_item_id);
+    res.json(ok(result, `已生成 ${result.count} 场循环赛`));
+  } catch (e) { next(e); }
+});
+
+/**
  * 积分榜
  * GET /api/group/standing?competition_id=&band_id=&event_item_id=&group_letter=
  */
@@ -245,23 +257,24 @@ router.get('/group-standing', async (req, res, next) => {
 });
 
 /**
- * 径赛分组生成
+ * 径赛分组生成（已移除）
  *
- * ⚠️ 已弃用（2026-10-27）：本端点把分组写进 heat_group / heat_member（旧表），
- *    而成绩录入页读的是 track_heat / heat_entry（新表），两边互不可见。
- *    请改用 POST /track-result/arrange（前端「成绩录入 → 分组编排」）。
- *    行为保持不变，仅打日志，待 P1 统一路径后移除。
+ * ⚠️ 2026-11-03：直接返回错误，**不再执行**。
+ *
+ * 原来这个端点把分组写进 heat_group / heat_member（旧表），
+ * 而成绩录入页读的是 track_heat / heat_entry（新表），两边互不可见 ——
+ * 用户点「已生成」，数据却进了黑洞。
+ * 「打日志后照常执行」是最坏的处理方式：既堵不住黑洞，又留下误导性成功提示。
+ *
+ * 现在正确入口：POST /api/track-result/group-arrange
+ * 前端：田径项目 → 分组编排（/track-arrange）
  */
 router.post('/track-generate', roleRequired(1), async (req, res, next) => {
-  try {
-    const { competition_id, event_item_id } = req.body;
-    console.warn(
-      `[弃用] /group/track-generate 被调用（competition=${competition_id}, event_item=${event_item_id}）。` +
-      `该端点写入旧表 heat_group/heat_member，成绩录入页看不到；请改用 /track-result/arrange`
-    );
-    const result = await scheduler.generateTrackHeats(competition_id, event_item_id);
-    res.json(ok(result, `已生成 ${result.results.reduce((s, r) => s + r.heats, 0)} 个径赛分组`));
-  } catch (e) { next(e); }
+  return res.json(fail(
+    '径赛分组已统一到「田径分组编排」。请到「田径项目 → 分组编排」操作。' +
+    '（旧端点写入的分组在成绩录入页不可见，已停止执行）',
+    410
+  ));
 });
 
 module.exports = router;

@@ -1,6 +1,6 @@
 -- ============================================================
 -- 迁移：运动员增加身份证号（用于自动计算出生年月）
--- 执行：mysql -ucompete -pCompete@2026 sport_compete < migrate_athlete_idcard.sql
+-- 执行：mysql -ucompete -p<DB_PASSWORD> sport_compete < migrate_athlete_idcard.sql
 -- ============================================================
 
 SET NAMES utf8mb4;

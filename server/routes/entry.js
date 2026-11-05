@@ -225,8 +225,10 @@ router.post('/athlete-audit-batch', roleRequired(1), async (req, res, next) => {
 /**
  * 提交球队报名
  * POST /api/entry/team
+ *
+ * 权限：管理员(1) + 学校(2)。裁判(3)无权提交报名。
  */
-router.post('/team', async (req, res, next) => {
+router.post('/team', roleRequired(1, 2), async (req, res, next) => {
   try {
     const { competition_id, band_id, event_item_id, team_name, leader_name, coach_name, roster } = req.body;
     const partner_name = req.body.partner_name || null;
@@ -235,8 +237,10 @@ router.post('/team', async (req, res, next) => {
       return res.json(fail('请填写完整'));
     }
 
-    // 学校角色强制用自己学校
-    const schoolId = req.user.role === 2 ? req.user.school_id : (req.body.school_id || 0);
+    // 学校角色强制用自己学校；管理员可代报（必须显式指定 school_id）
+    const schoolId = req.user.role === 2
+      ? req.user.school_id
+      : Number(req.body.school_id) || 0;
     if (!schoolId) return res.json(fail('请选择学校'));
 
     // 按项目类型决定参赛单位：球队 / 个人单打 / 双打组合
@@ -288,13 +292,16 @@ router.post('/team', async (req, res, next) => {
 
 /**
  * 修改球队报名
+ *
+ * 权限：管理员 + 本校（跨校只有管理员可以）
  */
-router.put('/team/:id', async (req, res, next) => {
+router.put('/team/:id', roleRequired(1, 2), async (req, res, next) => {
   try {
     const { team_name, leader_name, coach_name, roster, band_id, event_item_id } = req.body;
     const entry = await queryOne('SELECT * FROM team_entry WHERE id = ?', [req.params.id]);
     if (!entry) return res.json(fail('报名不存在'));
-    if (req.user.role === 2 && entry.school_id !== req.user.school_id) {
+    // 原来只挡 role===2，裁判(3)会绕过；改成白名单：非管理员一律只能改本校
+    if (req.user.role !== 1 && entry.school_id !== req.user.school_id) {
       return res.json(fail('无权修改其他学校的报名'));
     }
 
@@ -322,19 +329,28 @@ router.put('/team/:id', async (req, res, next) => {
       }
     }
 
+    // 驳回原因修正后要能重报。
+    // 原来只有「改了组别或项目」才把 status 重置为 1，学校只改名单/领队就永远卡在「已驳回」，
+    // 而唯一键 uk_band_event_school 又让学校没法另起一条新报名 —— 流程彻底堵死。
+    // 现在：status=3（已驳回）时，任何编辑成功后都回到「待审核」。
+    const resubmit = Number(entry.status) === 3;
+    const nextStatus = changed ? 1 : (resubmit ? 1 : entry.status);
+
     await execute(
-      'UPDATE team_entry SET band_id=?, event_item_id=?, team_name=?, leader_name=?, coach_name=?, roster_json=?, status=? WHERE id=?',
+      'UPDATE team_entry SET band_id=?, event_item_id=?, team_name=?, leader_name=?, coach_name=?, roster_json=?, status=?, reject_reason=NULL WHERE id=?',
       [newBand,
        newItem,
        team_name != null && team_name !== '' ? team_name : entry.team_name,
        leader_name !== undefined ? leader_name : entry.leader_name,
        coach_name !== undefined ? coach_name : entry.coach_name,
        roster !== undefined ? (roster ? JSON.stringify(roster) : null) : entry.roster_json,
-       // 改了组别或项目，参赛资格就变了，退回待审核重走一遍
-       changed ? 1 : entry.status,
+       nextStatus,
        req.params.id]
     );
-    res.json(ok({ needAudit: changed }, changed ? '已保存，需重新审核' : '已保存'));
+    res.json(ok({
+      needAudit: changed || resubmit,
+      status: nextStatus
+    }, changed ? '已保存，需重新审核' : (resubmit ? '已保存，已重新提交待审核' : '已保存')));
   } catch (e) { next(e); }
 });
 
@@ -342,7 +358,7 @@ router.put('/team/:id', async (req, res, next) => {
  * 修改个人报名（组别 / 项目 / 运动员）
  * 已进入赛次的报名不允许改动，避免赛次名单与报名对不上
  */
-router.put('/athlete-entry/:id', async (req, res, next) => {
+router.put('/athlete-entry/:id', roleRequired(1, 2), async (req, res, next) => {
   try {
     const { band_id, event_item_id, athlete_id } = req.body;
     const row = await queryOne(
@@ -350,7 +366,7 @@ router.put('/athlete-entry/:id', async (req, res, next) => {
        FROM athlete_entry ae JOIN athlete a ON a.id = ae.athlete_id
        WHERE ae.id = ?`, [req.params.id]);
     if (!row) return res.json(fail('报名不存在'));
-    if (req.user.role === 2 && row.school_id !== req.user.school_id) {
+    if (req.user.role !== 1 && row.school_id !== req.user.school_id) {
       return res.json(fail('无权修改其他学校的报名'));
     }
 
@@ -381,25 +397,29 @@ router.put('/athlete-entry/:id', async (req, res, next) => {
       }
     }
 
+    // 组别 / 项目 / 运动员任一变动，或从「已驳回」重报，都退回待审核
+    const resubmit = Number(row.status) === 3;
+    const nextStatus = changed ? 1 : (resubmit ? 1 : row.status);
+
     await execute(
-      'UPDATE athlete_entry SET band_id=?, event_item_id=?, athlete_id=?, status=? WHERE id=?',
-      [newBand, newItem, newAthlete,
-       // 组别 / 项目 / 运动员任一变动，都退回待审核
-       changed ? 1 : row.status,
-       req.params.id]
+      'UPDATE athlete_entry SET band_id=?, event_item_id=?, athlete_id=?, status=?, reject_reason=NULL WHERE id=?',
+      [newBand, newItem, newAthlete, nextStatus, req.params.id]
     );
-    res.json(ok({ needAudit: changed }, changed ? '已保存，需重新审核' : '已保存'));
+    res.json(ok({
+      needAudit: changed || resubmit,
+      status: nextStatus
+    }, changed ? '已保存，需重新审核' : (resubmit ? '已保存，已重新提交待审核' : '已保存')));
   } catch (e) { next(e); }
 });
 
 /**
  * 删除报名
  */
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', roleRequired(1, 2), async (req, res, next) => {
   try {
     const entry = await queryOne('SELECT * FROM team_entry WHERE id = ?', [req.params.id]);
     if (!entry) return res.json(fail('报名不存在'));
-    if (req.user.role === 2 && entry.school_id !== req.user.school_id) {
+    if (req.user.role !== 1 && entry.school_id !== req.user.school_id) {
       return res.json(fail('无权删除其他学校的报名'));
     }
     await execute('DELETE FROM team_entry WHERE id = ?', [req.params.id]);
@@ -415,11 +435,14 @@ router.post('/audit', roleRequired(1), async (req, res, next) => {
   try {
     const { id, status, reject_reason } = req.body;
     if (!id || !status) return res.json(fail('参数不完整'));
+    // 状态白名单：只接受 2=通过 3=驳回。原来直接写库，能写出 0/9 之类脏状态
+    const st = Number(status);
+    if (st !== 2 && st !== 3) return res.json(fail('审核状态不合法'));
     await execute(
       'UPDATE team_entry SET status=?, reject_reason=? WHERE id=?',
-      [status, reject_reason || null, id]
+      [st, st === 3 ? (reject_reason || '未填写原因') : null, id]
     );
-    res.json(ok(null, status === 2 ? '已通过' : '已驳回'));
+    res.json(ok(null, st === 2 ? '已通过' : '已驳回'));
   } catch (e) { next(e); }
 });
 
@@ -653,14 +676,14 @@ router.get('/athletes/:id/card', async (req, res, next) => {
 /**
  * 新增运动员
  */
-router.post('/athletes', async (req, res, next) => {
+router.post('/athletes', roleRequired(1, 2), async (req, res, next) => {
   try {
     const {
       name, gender, class_name, student_no, id_card, school_id,
       photo, student_card, student_card_name, student_card_type
     } = req.body;
     if (!name) return res.json(fail('请填写姓名'));
-    const sid = req.user.role === 2 ? req.user.school_id : school_id;
+    const sid = req.user.role === 2 ? req.user.school_id : Number(school_id) || 0;
     if (!sid) return res.json(fail('请选择学校'));
 
     const idCardVal = String(id_card || '').trim().toUpperCase() || null;
@@ -697,11 +720,11 @@ router.post('/athletes', async (req, res, next) => {
  * 修改运动员
  * PUT /api/entry/athletes/:id
  */
-router.put('/athletes/:id', async (req, res, next) => {
+router.put('/athletes/:id', roleRequired(1, 2), async (req, res, next) => {
   try {
     const a = await queryOne('SELECT * FROM athlete WHERE id = ?', [req.params.id]);
     if (!a) return res.json(fail('运动员不存在'));
-    if (req.user.role === 2 && a.school_id !== req.user.school_id) {
+    if (req.user.role !== 1 && a.school_id !== req.user.school_id) {
       return res.json(fail('无权修改其他学校的运动员'));
     }
 
@@ -754,11 +777,11 @@ router.put('/athletes/:id', async (req, res, next) => {
 /**
  * 删除运动员
  */
-router.delete('/athletes/:id', async (req, res, next) => {
+router.delete('/athletes/:id', roleRequired(1, 2), async (req, res, next) => {
   try {
     const a = await queryOne('SELECT * FROM athlete WHERE id = ?', [req.params.id]);
     if (!a) return res.json(fail('不存在'));
-    if (req.user.role === 2 && a.school_id !== req.user.school_id) {
+    if (req.user.role !== 1 && a.school_id !== req.user.school_id) {
       return res.json(fail('无权删除'));
     }
     await execute('DELETE FROM athlete_entry WHERE athlete_id = ?', [req.params.id]);
@@ -770,7 +793,7 @@ router.delete('/athletes/:id', async (req, res, next) => {
 /**
  * 添加径赛项目报名
  */
-router.post('/athlete', async (req, res, next) => {
+router.post('/athlete', roleRequired(1, 2), async (req, res, next) => {
   try {
     const { competition_id, band_id, athlete_id, event_item_id } = req.body;
     if (!competition_id || !band_id || !athlete_id || !event_item_id) {
@@ -816,9 +839,15 @@ router.post('/athlete', async (req, res, next) => {
  */
 router.post('/athlete-audit', roleRequired(1), async (req, res, next) => {
   try {
-    const { id, status } = req.body;
-    await execute('UPDATE athlete_entry SET status = ? WHERE id = ?', [status, id]);
-    res.json(ok(null, status === 2 ? '已通过' : '已驳回'));
+    const { id, status, reject_reason } = req.body;
+    const st = Number(status);
+    if (st !== 2 && st !== 3) return res.json(fail('审核状态不合法'));
+    // 原来只写 status，驳回原因根本没落库，学校看不到为什么被打回
+    await execute(
+      'UPDATE athlete_entry SET status = ?, reject_reason = ? WHERE id = ?',
+      [st, st === 3 ? (reject_reason || '未填写原因') : null, id]
+    );
+    res.json(ok(null, st === 2 ? '已通过' : '已驳回'));
   } catch (e) { next(e); }
 });
 
